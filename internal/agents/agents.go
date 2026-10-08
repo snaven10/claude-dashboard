@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -180,6 +181,61 @@ func normalizeStatus(r rawAgent) string {
 	return StatusBusy
 }
 
+// projectCache evita re-stat/re-read de .git en cada poll (3 s por sesión).
+var projectCache sync.Map // cwd -> string
+
+// projectName devuelve el nombre del repo al que pertenece cwd (no del
+// worktree). Sin ejecutar git: sube buscando .git; si es directorio, repo =
+// su padre; si es archivo "gitdir: …/.git/worktrees/x", repo = lo previo a
+// "/.git/worktrees/". Ante cualquier fallo, basename(cwd).
+func projectName(cwd string) string {
+	if cwd == "" {
+		return ""
+	}
+	if v, ok := projectCache.Load(cwd); ok {
+		return v.(string)
+	}
+	p := resolveProject(cwd)
+	projectCache.Store(cwd, p)
+	return p
+}
+
+func resolveProject(cwd string) string {
+	clean := filepath.Clean(cwd)
+	fallback := filepath.Base(clean)
+	for dir := clean; ; {
+		gitPath := filepath.Join(dir, ".git")
+		if fi, err := os.Stat(gitPath); err == nil {
+			if fi.IsDir() {
+				return filepath.Base(dir)
+			}
+			data, err := os.ReadFile(gitPath)
+			if err != nil {
+				return fallback
+			}
+			line := strings.TrimSpace(string(data))
+			target, ok := strings.CutPrefix(line, "gitdir:")
+			if !ok {
+				return fallback
+			}
+			target = strings.TrimSpace(target)
+			if !filepath.IsAbs(target) {
+				target = filepath.Join(dir, target)
+			}
+			target = filepath.ToSlash(filepath.Clean(target))
+			if i := strings.Index(target, "/.git/worktrees/"); i > 0 {
+				return filepath.Base(target[:i])
+			}
+			return fallback
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return fallback
+		}
+		dir = parent
+	}
+}
+
 func normalize(r rawAgent, f2 rawSession) Session {
 	id := r.ID
 	if id == "" {
@@ -192,10 +248,7 @@ func normalize(r rawAgent, f2 rawSession) Session {
 	if f2.StatusUpdatedAt > 0 {
 		last = f2.StatusUpdatedAt
 	}
-	project := ""
-	if r.Cwd != "" {
-		project = filepath.Base(filepath.Clean(r.Cwd))
-	}
+	project := projectName(r.Cwd)
 	return Session{
 		ID:             id,
 		SessionID:      r.SessionID,
