@@ -1,0 +1,13 @@
+[Unit]
+Description=claude-dashboard: panel de sesiones de Claude Code (solo lectura, loopback)
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/claude-dashboard
+Environment=PATH=%h/.local/bin:/usr/bin:/bin
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

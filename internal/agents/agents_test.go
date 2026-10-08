@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -92,5 +93,44 @@ func TestClaudeNoEnPATH(t *testing.T) {
 	_, err := List(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "claude") {
 		t.Fatalf("esperaba error claro sobre claude, got %v", err)
+	}
+}
+
+func TestProjectName(t *testing.T) {
+	root := t.TempDir()
+	mk := func(p string) string {
+		d := filepath.Join(root, p)
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		return d
+	}
+	// Repo principal: .git es un directorio.
+	repo := mk("repos/mi-repo")
+	mk("repos/mi-repo/.git")
+	sub := mk("repos/mi-repo/internal/x")
+	// Worktree: .git es un archivo apuntando a <repo>/.git/worktrees/<n>.
+	wt := mk("trees/ws/mi-repo/plan-1-task-9")
+	gitdir := "gitdir: " + filepath.Join(repo, ".git", "worktrees", "plan-1-task-9") + "\n"
+	if err := os.WriteFile(filepath.Join(wt, ".git"), []byte(gitdir), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wtSub := mk("trees/ws/mi-repo/plan-1-task-9/cmd")
+	// .git archivo ilegible/ajeno → basename(cwd).
+	odd := mk("odd/carpeta")
+	if err := os.WriteFile(filepath.Join(odd, ".git"), []byte("basura"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Sin repo (el TempDir no está dentro de ningún .git).
+	plain := mk("sin/repo")
+
+	cases := map[string]string{
+		repo: "mi-repo", sub: "mi-repo", wt: "mi-repo", wtSub: "mi-repo",
+		odd: "carpeta", plain: "repo", "": "",
+	}
+	for cwd, want := range cases {
+		if got := projectName(cwd); got != want {
+			t.Errorf("projectName(%q) = %q, esperaba %q", cwd, got, want)
+		}
 	}
 }
