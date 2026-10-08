@@ -222,3 +222,74 @@ button:focus-visible, select:focus-visible, input:focus-visible {
   main { padding: 8px; }
   .top { padding: 8px; }
 }
+
+/* ---- PLAN-002 ---- */
+:root { --stale: #92400e; --stale-bg: #ffedd5; --overlay: rgba(0, 0, 0, 0.5); }
+@media (prefers-color-scheme: dark) {
+  :root { --stale: #fdba74; --stale-bg: #431407; --overlay: rgba(0, 0, 0, 0.7); }
+}
+
+.badge.stale { align-self: flex-start; color: var(--stale); background: var(--stale-bg); white-space: normal; }
+.orq {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--busy);
+  overflow-wrap: anywhere;
+}
+.tokens {
+  font-size: 0.8rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.card { cursor: pointer; }
+
+.groups { display: flex; flex-direction: column; gap: 16px; }
+.group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+.group-count { font-size: 0.8rem; font-weight: 400; color: var(--muted); }
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 5vh 8px;
+  background: var(--overlay);
+}
+.overlay[hidden] { display: none; }
+.panel {
+  width: 100%;
+  max-width: 720px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 0;
+}
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-head h2 { margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
+.panel-body { padding: 10px 12px; overflow: auto; }
+.events { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ev { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 0.85rem; min-width: 0; }
+.ev-at, .ev-kind { color: var(--muted); font-size: 0.75rem; }
+.ev-kind { text-transform: uppercase; letter-spacing: 0.03em; }
+.ev-text { flex-basis: 100%; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 30vh; overflow: auto; }
+.ev-tool .ev-text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8rem; }
+.ev-prompt .ev-text { font-weight: 600; }
