@@ -31,7 +31,7 @@ func TestSummaryBasic(t *testing.T) {
 		t.Errorf("title = %q", d.Title)
 	}
 	if d.LastPrompt != "arreglá el <b>bug</b> de login" {
-		t.Errorf("lastPrompt = %q (el tool_result no es prompt real)", d.LastPrompt)
+		t.Errorf("lastPrompt = %q (tool_result, isMeta y avisos del harness no son prompt real)", d.LastPrompt)
 	}
 	if d.LastAction == nil || d.LastAction.Kind != "tool" || d.LastAction.Text != "Bash: go test ./..." {
 		t.Errorf("lastAction = %+v", d.LastAction)
@@ -95,11 +95,11 @@ func TestBigFileReadsAtMost2MB(t *testing.T) {
 	}
 	// El prompt real está al principio de la cola "útil": 1 MB de tool_results después.
 	filler := toolResultLine() + "\n"
-	for i := 0; i < (49<<20)/len(filler); i++ {
+	for i := 0; i < (49<<20)/len(filler)+1; i++ {
 		f.WriteString(filler)
 	}
 	f.WriteString(userLine("prompt enterrado") + "\n")
-	for i := 0; i < (1<<20)/len(filler); i++ {
+	for i := 0; i < (1<<20)/len(filler)+1; i++ {
 		f.WriteString(filler)
 	}
 	f.Close()
