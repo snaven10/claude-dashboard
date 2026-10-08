@@ -53,6 +53,28 @@ type Session struct {
 	Title          string      `json:"title"`
 	LastPrompt     string      `json:"lastPrompt"`
 	LastAction     *LastAction `json:"lastAction"`
+	Stale          bool        `json:"stale"`
+	Orq            *Orq        `json:"orq"`
+	Tokens         *Tokens     `json:"tokens"`
+}
+
+// Orq identifica a la sesión como worker de orq (DD-10). Plan y Task son nil
+// si el key del job no matchea p<N>-task<M>.
+type Orq struct {
+	Job        string  `json:"job"`
+	Plan       *string `json:"plan"`
+	Task       *string `json:"task"`
+	Specialist string  `json:"specialist"`
+	WS         string  `json:"ws"`
+}
+
+// Tokens son los totales de uso de la sesión (DD-9). Sin costo (DD-11).
+type Tokens struct {
+	Input         int64  `json:"input"`
+	Output        int64  `json:"output"`
+	CacheRead     int64  `json:"cacheRead"`
+	CacheCreation int64  `json:"cacheCreation"`
+	Model         string `json:"model"`
 }
 
 // rawAgent es una entrada cruda de F1.

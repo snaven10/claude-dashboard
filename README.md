@@ -6,7 +6,17 @@ Daemon en Go (solo stdlib) con frontend vanilla embebido. URL: <http://localhost
 
 ## Qué muestra
 Por sesión: proyecto (nombre del repo, también si corre en un worktree), estado, qué
-espera, título, último prompt y última acción.
+espera, título, último prompt y última acción. Además (PLAN-002):
+
+| Campo | Qué es |
+|-------|--------|
+| `stale` | `true` si la sesión está `busy` y sin actividad hace más de `-stale` (default `10m`, `0` lo desactiva). Es "sin actividad hace X", no "colgada": un build largo se ve igual. |
+| `orq` | `{job, plan, task, specialist, ws}` si la sesión es un worker de orq (une `name` de F1 con `bgname` de `~/.orq/jobs.json`); `null` si no. `plan`/`task` salen del key (`p<N>-task<M>`) y son `null` si no matchea. Si `jobs.json` falta o está roto, todas quedan en `null`. |
+| `tokens` | `{input, output, cacheRead, cacheCreation, model}` acumulados del transcript (deduplicados por `message.id`); `null` si no hay transcript. Sin costo en dólares. |
+
+`GET /api/sessions/{sessionId}/timeline` devuelve `{sessionId, events}` con los últimos 20 eventos
+(`prompt` | `tool` | `text`, del más viejo al más nuevo), leídos de la cola del transcript. Solo acepta
+ids presentes en el último snapshot (404 si no).
 
 ## De dónde saca los datos
 | Fuente | Uso | Estabilidad |

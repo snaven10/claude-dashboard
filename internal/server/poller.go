@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"claude-dashboard/internal/agents"
+	"claude-dashboard/internal/orq"
 	"claude-dashboard/internal/transcript"
 )
 
@@ -31,7 +32,12 @@ func (s *Server) build(ctx context.Context) ([]agents.Session, error) {
 	if sessions == nil {
 		sessions = []agents.Session{}
 	}
-	if s.Summary == nil {
+	jobs := s.loadOrq()
+	now := s.now()
+	if s.Summary == nil && s.Usage == nil {
+		for i := range sessions {
+			s.enrich(&sessions[i], jobs, now)
+		}
 		return sessions, nil
 	}
 	sem := make(chan struct{}, summaryConcurrency)
@@ -51,7 +57,45 @@ func (s *Server) build(ctx context.Context) ([]agents.Session, error) {
 		}(&sessions[i])
 	}
 	wg.Wait()
+	for i := range sessions {
+		s.enrich(&sessions[i], jobs, now)
+	}
 	return sessions, nil
+}
+
+func (s *Server) now() time.Time {
+	if s.Now != nil {
+		return s.Now()
+	}
+	return time.Now()
+}
+
+// loadOrq lee jobs.json; un fallo se loguea y degrada a "sin orq" (DD-10).
+func (s *Server) loadOrq() map[string]orq.Job {
+	if s.Orq == nil {
+		return nil
+	}
+	jobs, err := s.Orq()
+	if err != nil {
+		s.logf("orq: %v", err)
+	}
+	return jobs
+}
+
+// enrich completa orq y stale (DD-8, DD-10). Stale depende de lastActivityAt
+// y no de un contador: el hash solo cambia cuando el valor cambia.
+func (s *Server) enrich(ss *agents.Session, jobs map[string]orq.Job, now time.Time) {
+	if ss.Name != "" {
+		if j, ok := jobs[ss.Name]; ok {
+			o := &agents.Orq{Job: j.ID, Specialist: j.Specialist, WS: j.WS}
+			if plan, task, ok := j.PlanTask(); ok {
+				o.Plan, o.Task = &plan, &task
+			}
+			ss.Orq = o
+		}
+	}
+	ss.Stale = s.StaleAfter > 0 && ss.Status == agents.StatusBusy && ss.LastActivityAt > 0 &&
+		now.UnixMilli()-ss.LastActivityAt > s.StaleAfter.Milliseconds()
 }
 
 func applyDetail(ss *agents.Session, d transcript.Detail) {
@@ -92,7 +136,7 @@ func (s *Server) Refresh(ctx context.Context) (bool, error) {
 		s.mu.Unlock()
 		return false, fmt.Errorf("serializando snapshot: %w", err)
 	}
-	s.hash, s.have, s.current = sum, true, payload
+	s.hash, s.have, s.current, s.sessions = sum, true, payload, sessions
 	s.mu.Unlock()
 
 	s.broadcast(payload)

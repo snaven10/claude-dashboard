@@ -4,6 +4,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"claude-dashboard/internal/agents"
+	"claude-dashboard/internal/orq"
 	"claude-dashboard/internal/transcript"
 )
 
@@ -26,18 +28,24 @@ const (
 // Server junta poller, broadcaster y rutas. Las dependencias externas se
 // inyectan como función para testear sin ejecutar `claude`.
 type Server struct {
-	List      func(ctx context.Context) ([]agents.Session, error)
-	Summary   func(cwd, sessionID string) (transcript.Detail, error)
-	Static    fs.FS
-	Interval  time.Duration
-	Heartbeat time.Duration
-	Logf      func(format string, args ...any)
+	List       func(ctx context.Context) ([]agents.Session, error)
+	Summary    func(cwd, sessionID string) (transcript.Detail, error)
+	Usage      func(cwd, sessionID string) (*transcript.Tokens, error)
+	Timeline   func(cwd, sessionID string) ([]transcript.Event, error)
+	Orq        func() (map[string]orq.Job, error)
+	StaleAfter time.Duration // 0 desactiva stale
+	Now        func() time.Time
+	Static     fs.FS
+	Interval   time.Duration
+	Heartbeat  time.Duration
+	Logf       func(format string, args ...any)
 
-	mu      sync.Mutex
-	hash    [32]byte
-	have    bool
-	current []byte
-	subs    map[chan []byte]struct{}
+	mu       sync.Mutex
+	hash     [32]byte
+	have     bool
+	current  []byte
+	sessions []agents.Session
+	subs     map[chan []byte]struct{}
 }
 
 func (s *Server) logf(format string, args ...any) {
@@ -90,6 +98,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/sessions", s.handleSessions)
 	mux.HandleFunc("GET /api/events", s.handleEvents)
+	mux.HandleFunc("GET /api/sessions/{sessionId}/timeline", s.handleTimeline)
 	if s.Static != nil {
 		mux.Handle("/", http.FileServer(http.FS(s.Static)))
 	}
@@ -115,6 +124,51 @@ func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	_, _ = w.Write(body)
+}
+
+// handleTimeline sirve los últimos eventos de una sesión. El id se valida
+// contra el último snapshot: nunca se usa para armar una ruta sin validar.
+func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("sessionId")
+	s.mu.Lock()
+	have := s.have
+	s.mu.Unlock()
+	if !have {
+		if _, err := s.Refresh(r.Context()); err != nil {
+			s.logf("timeline: %v", err)
+			http.Error(w, "no se pudieron listar las sesiones: "+err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+	}
+	var found *agents.Session
+	s.mu.Lock()
+	for i := range s.sessions {
+		if s.sessions[i].SessionID == id && id != "" {
+			c := s.sessions[i]
+			found = &c
+			break
+		}
+	}
+	s.mu.Unlock()
+	if found == nil {
+		http.NotFound(w, r)
+		return
+	}
+	events := []transcript.Event{}
+	if s.Timeline != nil {
+		ev, err := s.Timeline(found.Cwd, found.SessionID)
+		if err != nil {
+			s.logf("timeline %s: %v", id, err)
+		} else if ev != nil {
+			events = ev
+		}
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(struct {
+		SessionID string             `json:"sessionId"`
+		Events    []transcript.Event `json:"events"`
+	}{id, events})
 }
 
 func writeEvent(w http.ResponseWriter, f http.Flusher, payload []byte) error {
