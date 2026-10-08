@@ -61,6 +61,36 @@ func TestUsageDedupsSplitMessage(t *testing.T) {
 	}
 }
 
+func TestUsageChunkBoundaries(t *testing.T) {
+	_, path := usageSetup(t)
+	old := usageChunk
+	usageChunk = 7 // casi todas las líneas quedan partidas entre bloques
+	t.Cleanup(func() { usageChunk = old })
+	var b strings.Builder
+	for i := 0; i < 3; i++ {
+		b.WriteString(asstLine("msg_1", 10, 20, 300, 40, "claude-opus-5-5"))
+	}
+	b.WriteString(asstLine("msg_2", 1, 2, 3, 4, "claude-opus-5-5"))
+	b.WriteString(`{"type":"assistant","message":{"id":"msg_3","usage":{"output_tokens":5`) // incompleta
+	if err := os.WriteFile(path, []byte(b.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tk, err := Usage("/work/usage", "sess-u")
+	if err != nil || tk == nil {
+		t.Fatalf("tk=%v err=%v", tk, err)
+	}
+	want := Tokens{Input: 11, Output: 22, CacheRead: 303, CacheCreation: 44, Model: "claude-opus-5-5"}
+	if *tk != want {
+		t.Errorf("got %+v want %+v", *tk, want)
+	}
+	// al completarse, la línea partida se cuenta una sola vez
+	appendFile(t, path, `}}}`+"\n")
+	tk, _ = Usage("/work/usage", "sess-u")
+	if tk == nil || tk.Output != 27 {
+		t.Errorf("tras completar la línea: %+v, esperaba output 27", tk)
+	}
+}
+
 func TestUsageIncrementalAndTruncate(t *testing.T) {
 	_, path := usageSetup(t)
 	first := asstLine("m1", 5, 5, 0, 0, "mod-a") + asstLine("m2", 5, 5, 0, 0, "mod-a")

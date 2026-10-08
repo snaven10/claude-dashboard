@@ -23,6 +23,11 @@ type Tokens struct {
 	Model         string `json:"model"`
 }
 
+// usageChunk es el tamaño de bloque de lectura; maxLine acota una línea que cruza bloques.
+var usageChunk = 4 << 20 // var: los tests lo achican para cruzar bordes de bloque
+
+const maxLine = 64 << 20
+
 // usageBytesRead cuenta los bytes leídos por el acumulador (para tests).
 var usageBytesRead atomic.Int64
 
@@ -108,22 +113,38 @@ func accumulate(path string) (*Tokens, error) {
 	}
 	if size > st.offset {
 		first := st.offset == 0
-		start := time.Now()
-		buf := make([]byte, size-st.offset)
-		n, err := f.ReadAt(buf, st.offset)
-		if err != nil && !errors.Is(err, io.EOF) {
-			return nil, err
-		}
-		usageBytesRead.Add(int64(n))
-		buf = buf[:n]
-		// solo líneas completas: lo que sigue al último '\n' queda para el próximo ciclo
-		end := bytes.LastIndexByte(buf, '\n')
-		if end >= 0 {
-			st.consume(buf[:end+1])
+		start, leidos := time.Now(), int64(0)
+		// Por bloques: hay transcripts de >100 MB y la primera lectura es entera;
+		// con un solo buffer del tamaño del archivo, 8 en paralelo eran cientos de MB.
+		buf := make([]byte, usageChunk)
+		var resto []byte // línea incompleta que cruza el borde del bloque
+		for pos := st.offset; pos < size; {
+			n, err := f.ReadAt(buf[:min(int64(len(buf)), size-pos)], pos)
+			if err != nil && !errors.Is(err, io.EOF) {
+				return nil, err
+			}
+			if n == 0 {
+				break
+			}
+			usageBytesRead.Add(int64(n))
+			leidos += int64(n)
+			pos += int64(n)
+			data := append(resto, buf[:n]...)
+			// solo líneas completas: lo que sigue al último '\n' queda para después
+			end := bytes.LastIndexByte(data, '\n')
+			if end < 0 {
+				resto = data
+				continue
+			}
+			st.consume(data[:end+1])
 			st.offset += int64(end + 1)
+			resto = append([]byte(nil), data[end+1:]...)
+			if int64(len(resto)) > maxLine { // línea patológica: no acumular sin límite
+				return nil, fmt.Errorf("línea de más de %d bytes en %s", maxLine, path)
+			}
 		}
-		if first && n > initialWindow {
-			log.Printf("transcript: primera lectura completa de %s: %d bytes en %s", path, n, time.Since(start).Round(time.Millisecond))
+		if first && leidos > initialWindow {
+			log.Printf("transcript: primera lectura completa de %s: %d bytes en %s", path, leidos, time.Since(start).Round(time.Millisecond))
 		}
 	}
 	if !st.counted {
