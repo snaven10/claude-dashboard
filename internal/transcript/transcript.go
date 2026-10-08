@@ -198,6 +198,7 @@ type line struct {
 	Timestamp  string `json:"timestamp"`
 	AITitle    string `json:"aiTitle"`
 	LastPrompt string `json:"lastPrompt"`
+	IsMeta     bool   `json:"isMeta"`
 	Message    struct {
 		Content json.RawMessage `json:"content"`
 	} `json:"message"`
@@ -240,7 +241,7 @@ func parse(data []byte) (Detail, bool) {
 				fallbackPrompt = strings.TrimSpace(l.LastPrompt)
 			}
 		case "user":
-			if !realUser {
+			if !realUser && !l.IsMeta {
 				if text, ok := realUserText(l.Message.Content); ok {
 					d.LastPrompt = truncate(text, maxPrompt)
 					realUser = true
@@ -279,7 +280,7 @@ func realUserText(content json.RawMessage) (string, bool) {
 	var s string
 	if json.Unmarshal(content, &s) == nil {
 		s = strings.TrimSpace(s)
-		return s, s != ""
+		return s, s != "" && !harnessText(s)
 	}
 	var blocks []block
 	if json.Unmarshal(content, &blocks) != nil {
@@ -296,10 +297,25 @@ func realUserText(content json.RawMessage) (string, bool) {
 			}
 		}
 	}
-	if len(parts) == 0 {
+	if len(parts) == 0 || harnessText(parts[0]) {
 		return "", false
 	}
 	return strings.Join(parts, "\n"), true
+}
+
+// harnessPrefixes marcan mensajes `user` que inyecta Claude Code y no escribió
+// el humano (avisos de background, salida de comandos locales, reminders).
+var harnessPrefixes = []string{
+	"<task-notification>", "<local-command-", "<command-", "<system-reminder>",
+}
+
+func harnessText(s string) bool {
+	for _, p := range harnessPrefixes {
+		if strings.HasPrefix(s, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // assistantAction toma el último tool_use del mensaje; si no hay, el último
