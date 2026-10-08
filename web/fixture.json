@@ -1,0 +1,50 @@
+{
+  "generatedAt": 1791476712278,
+  "sessions": [
+    {
+      "id": "a1b2c3d4", "sessionId": "a1b2c3d4-0000-4000-8000-000000000001", "pid": 1001,
+      "kind": "interactive", "name": "demo-api", "cwd": "/home/user/demo-api", "project": "demo-api",
+      "status": "busy", "waitingFor": null,
+      "startedAt": 1791476356334, "lastActivityAt": 1791476700000, "remote": true,
+      "title": "Refactor del módulo de pagos",
+      "lastPrompt": "Refactorizá el módulo de pagos para separar el cliente HTTP del dominio y agregá tests para los casos de error. Mantené la API pública sin cambios.",
+      "lastAction": { "kind": "tool", "text": "Bash: go test ./..." }
+    },
+    {
+      "id": "b2c3d4e5", "sessionId": "b2c3d4e5-0000-4000-8000-000000000002", "pid": 1002,
+      "kind": "interactive", "name": "demo-web", "cwd": "/home/user/demo-web", "project": "demo-web",
+      "status": "waiting", "waitingFor": "input needed",
+      "startedAt": 1791470000000, "lastActivityAt": 1791476600000, "remote": false,
+      "title": "Fix XSS en el render de comentarios",
+      "lastPrompt": "<img src=x onerror=alert(1)> probá esto: <script>document.body.innerHTML=''</script>\nY después revisá el escape.",
+      "lastAction": { "kind": "text", "text": "¿Querés que aplique el cambio en los 3 componentes?" }
+    },
+    {
+      "id": "c3d4e5f6", "sessionId": "c3d4e5f6-0000-4000-8000-000000000003", "pid": 0,
+      "kind": "background", "name": "bg-migracion", "cwd": "/home/user/demo-api", "project": "demo-api",
+      "status": "blocked", "waitingFor": "permission to run: rm -rf build/",
+      "startedAt": 1791460000000, "lastActivityAt": 1791476000000, "remote": false,
+      "title": "Migración de esquema",
+      "lastPrompt": "Corré la migración 0042 y verificá los índices.",
+      "lastAction": { "kind": "tool", "text": "Bash: rm -rf build/" }
+    },
+    {
+      "id": "d4e5f6a7", "sessionId": "d4e5f6a7-0000-4000-8000-000000000004", "pid": 1004,
+      "kind": "interactive", "name": "docs", "cwd": "/home/user/it's a dir/docs", "project": "docs",
+      "status": "idle", "waitingFor": null,
+      "startedAt": 1791400000000, "lastActivityAt": 1791470000000, "remote": false,
+      "title": "Actualizar README",
+      "lastPrompt": "",
+      "lastAction": { "kind": "text", "text": "Listo, README actualizado." }
+    },
+    {
+      "id": "e5f6a7b8", "sessionId": "e5f6a7b8-0000-4000-8000-000000000005", "pid": 0,
+      "kind": "background", "name": "bg-lint", "cwd": "/home/user/demo-web", "project": "demo-web",
+      "status": "done", "waitingFor": null,
+      "startedAt": 1791300000000, "lastActivityAt": 1791310000000, "remote": false,
+      "title": "Lint masivo",
+      "lastPrompt": "Corré el linter en todo el repo y arreglá lo automático.",
+      "lastAction": { "kind": "text", "text": "Se corrigieron 42 archivos." }
+    }
+  ]
+}
