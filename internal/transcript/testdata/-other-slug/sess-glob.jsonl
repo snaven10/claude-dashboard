@@ -1,0 +1,2 @@
+{"type":"user","timestamp":"2026-02-02T08:00:00Z","message":{"role":"user","content":"prompt via glob"}}
+{"type":"assistant","timestamp":"2026-02-02T08:00:03Z","message":{"role":"assistant","content":[{"type":"text","text":"Listo, terminé."}]}}
