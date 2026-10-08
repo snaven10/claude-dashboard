@@ -1,0 +1,30 @@
+{
+  "sessionId": "a1b2c3d4-0000-4000-8000-000000000001",
+  "events": [
+    {
+      "at": 1791476700000,
+      "kind": "prompt",
+      "text": "<img src=x onerror=alert(1)> <script>document.body.innerHTML=''</script>\nrefactorizá pagos"
+    },
+    {
+      "at": 1791476701000,
+      "kind": "tool",
+      "text": "Bash: go test ./... <b>x</b>"
+    },
+    {
+      "at": 1791476702000,
+      "kind": "text",
+      "text": "<script>alert('hostil')</script> Listo, los tests pasan."
+    },
+    {
+      "at": 1791476703000,
+      "kind": "tool",
+      "text": "Edit: internal/pagos/cliente.go"
+    },
+    {
+      "at": 1791476704000,
+      "kind": "text",
+      "text": "Texto largo sin espacios: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+  ]
+}

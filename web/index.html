@@ -25,12 +25,23 @@
       </label>
       <label class="check"><input type="checkbox" id="f-done"> ocultar done</label>
       <label class="check"><input type="checkbox" id="f-idle"> ocultar idle</label>
+      <label class="check"><input type="checkbox" id="f-group"> agrupar por plan</label>
+      <button type="button" id="btn-notify" aria-pressed="false">activar avisos</button>
     </div>
   </header>
   <main>
     <p id="empty" class="empty" hidden>No hay sesiones para mostrar.</p>
     <section id="grid" class="grid" aria-label="Sesiones"></section>
   </main>
+  <div id="timeline" class="overlay" hidden>
+    <div class="panel" role="dialog" aria-modal="true" aria-labelledby="timeline-title">
+      <div class="panel-head">
+        <h2 id="timeline-title"></h2>
+        <button type="button" id="timeline-close" aria-label="Cerrar (Esc)">✕</button>
+      </div>
+      <div id="timeline-body" class="panel-body"></div>
+    </div>
+  </div>
   <script src="app.js"></script>
 </body>
 </html>

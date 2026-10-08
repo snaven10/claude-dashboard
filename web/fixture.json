@@ -2,49 +2,190 @@
   "generatedAt": 1791476712278,
   "sessions": [
     {
-      "id": "a1b2c3d4", "sessionId": "a1b2c3d4-0000-4000-8000-000000000001", "pid": 1001,
-      "kind": "interactive", "name": "demo-api", "cwd": "/home/user/demo-api", "project": "demo-api",
-      "status": "busy", "waitingFor": null,
-      "startedAt": 1791476356334, "lastActivityAt": 1791476700000, "remote": true,
+      "id": "a1b2c3d4",
+      "sessionId": "a1b2c3d4-0000-4000-8000-000000000001",
+      "pid": 1001,
+      "kind": "interactive",
+      "name": "demo-api",
+      "cwd": "/home/user/demo-api",
+      "project": "demo-api",
+      "status": "busy",
+      "waitingFor": null,
+      "startedAt": 1791476356334,
+      "lastActivityAt": 1791476700000,
+      "remote": true,
       "title": "Refactor del módulo de pagos",
       "lastPrompt": "Refactorizá el módulo de pagos para separar el cliente HTTP del dominio y agregá tests para los casos de error. Mantené la API pública sin cambios.",
-      "lastAction": { "kind": "tool", "text": "Bash: go test ./..." }
+      "lastAction": {
+        "kind": "tool",
+        "text": "Bash: go test ./..."
+      },
+      "stale": false,
+      "orq": {
+        "job": "9efa2c1a",
+        "plan": "1",
+        "task": "005",
+        "specialist": "claude-dashboard-worker",
+        "ws": "claude-dashboard"
+      },
+      "tokens": {
+        "input": 1234,
+        "output": 56780,
+        "cacheRead": 1150000,
+        "cacheCreation": 45000,
+        "model": "claude-opus-5-5"
+      }
     },
     {
-      "id": "b2c3d4e5", "sessionId": "b2c3d4e5-0000-4000-8000-000000000002", "pid": 1002,
-      "kind": "interactive", "name": "demo-web", "cwd": "/home/user/demo-web", "project": "demo-web",
-      "status": "waiting", "waitingFor": "input needed",
-      "startedAt": 1791470000000, "lastActivityAt": 1791476600000, "remote": false,
+      "id": "b2c3d4e5",
+      "sessionId": "b2c3d4e5-0000-4000-8000-000000000002",
+      "pid": 1002,
+      "kind": "interactive",
+      "name": "demo-web",
+      "cwd": "/home/user/demo-web",
+      "project": "demo-web",
+      "status": "waiting",
+      "waitingFor": "input needed",
+      "startedAt": 1791470000000,
+      "lastActivityAt": 1791476600000,
+      "remote": false,
       "title": "Fix XSS en el render de comentarios",
       "lastPrompt": "<img src=x onerror=alert(1)> probá esto: <script>document.body.innerHTML=''</script>\nY después revisá el escape.",
-      "lastAction": { "kind": "text", "text": "¿Querés que aplique el cambio en los 3 componentes?" }
+      "lastAction": {
+        "kind": "text",
+        "text": "¿Querés que aplique el cambio en los 3 componentes?"
+      },
+      "stale": false,
+      "orq": null,
+      "tokens": {
+        "input": 900,
+        "output": 120,
+        "cacheRead": 0,
+        "cacheCreation": 0,
+        "model": "claude-sonnet-5-5"
+      }
     },
     {
-      "id": "c3d4e5f6", "sessionId": "c3d4e5f6-0000-4000-8000-000000000003", "pid": 0,
-      "kind": "background", "name": "bg-migracion", "cwd": "/home/user/demo-api", "project": "demo-api",
-      "status": "blocked", "waitingFor": "permission to run: rm -rf build/",
-      "startedAt": 1791460000000, "lastActivityAt": 1791476000000, "remote": false,
+      "id": "c3d4e5f6",
+      "sessionId": "c3d4e5f6-0000-4000-8000-000000000003",
+      "pid": 0,
+      "kind": "background",
+      "name": "bg-migracion",
+      "cwd": "/home/user/demo-api",
+      "project": "demo-api",
+      "status": "blocked",
+      "waitingFor": "permission to run: rm -rf build/",
+      "startedAt": 1791460000000,
+      "lastActivityAt": 1791476000000,
+      "remote": false,
       "title": "Migración de esquema",
       "lastPrompt": "Corré la migración 0042 y verificá los índices.",
-      "lastAction": { "kind": "tool", "text": "Bash: rm -rf build/" }
+      "lastAction": {
+        "kind": "tool",
+        "text": "Bash: rm -rf build/"
+      },
+      "stale": false,
+      "orq": {
+        "job": "1b2c3d4e",
+        "plan": "2",
+        "task": "006",
+        "specialist": "claude-dashboard-worker",
+        "ws": "claude-dashboard"
+      },
+      "tokens": null
     },
     {
-      "id": "d4e5f6a7", "sessionId": "d4e5f6a7-0000-4000-8000-000000000004", "pid": 1004,
-      "kind": "interactive", "name": "docs", "cwd": "/home/user/it's a dir/docs", "project": "docs",
-      "status": "idle", "waitingFor": null,
-      "startedAt": 1791400000000, "lastActivityAt": 1791470000000, "remote": false,
+      "id": "d4e5f6a7",
+      "sessionId": "d4e5f6a7-0000-4000-8000-000000000004",
+      "pid": 1004,
+      "kind": "interactive",
+      "name": "docs",
+      "cwd": "/home/user/it's a dir/docs",
+      "project": "docs",
+      "status": "idle",
+      "waitingFor": null,
+      "startedAt": 1791400000000,
+      "lastActivityAt": 1791470000000,
+      "remote": false,
       "title": "Actualizar README",
       "lastPrompt": "",
-      "lastAction": { "kind": "text", "text": "Listo, README actualizado." }
+      "lastAction": {
+        "kind": "text",
+        "text": "Listo, README actualizado."
+      },
+      "stale": false,
+      "orq": null,
+      "tokens": null
     },
     {
-      "id": "e5f6a7b8", "sessionId": "e5f6a7b8-0000-4000-8000-000000000005", "pid": 0,
-      "kind": "background", "name": "bg-lint", "cwd": "/home/user/demo-web", "project": "demo-web",
-      "status": "done", "waitingFor": null,
-      "startedAt": 1791300000000, "lastActivityAt": 1791310000000, "remote": false,
+      "id": "e5f6a7b8",
+      "sessionId": "e5f6a7b8-0000-4000-8000-000000000005",
+      "pid": 0,
+      "kind": "background",
+      "name": "bg-lint",
+      "cwd": "/home/user/demo-web",
+      "project": "demo-web",
+      "status": "done",
+      "waitingFor": null,
+      "startedAt": 1791300000000,
+      "lastActivityAt": 1791310000000,
+      "remote": false,
       "title": "Lint masivo",
       "lastPrompt": "Corré el linter en todo el repo y arreglá lo automático.",
-      "lastAction": { "kind": "text", "text": "Se corrigieron 42 archivos." }
+      "lastAction": {
+        "kind": "text",
+        "text": "Se corrigieron 42 archivos."
+      },
+      "stale": false,
+      "orq": {
+        "job": "77aa88bb",
+        "plan": null,
+        "task": null,
+        "specialist": "reviewer",
+        "ws": "demo-web"
+      },
+      "tokens": {
+        "input": 50,
+        "output": 999999,
+        "cacheRead": 0,
+        "cacheCreation": 0,
+        "model": ""
+      }
+    },
+    {
+      "id": "f6a7b8c9",
+      "sessionId": "f6a7b8c9-0000-4000-8000-000000000006",
+      "pid": 1006,
+      "kind": "interactive",
+      "name": "demo-build",
+      "cwd": "/home/user/demo-api",
+      "project": "demo-api",
+      "status": "busy",
+      "waitingFor": null,
+      "startedAt": 1791470000000,
+      "lastActivityAt": 1791475000000,
+      "remote": false,
+      "stale": true,
+      "title": "Build largo",
+      "lastPrompt": "Compilá todo y corré la suite completa.",
+      "lastAction": {
+        "kind": "tool",
+        "text": "Bash: make test"
+      },
+      "orq": {
+        "job": "c0ffee11",
+        "plan": "1",
+        "task": "004",
+        "specialist": "claude-dashboard-worker",
+        "ws": "claude-dashboard"
+      },
+      "tokens": {
+        "input": 10,
+        "output": 20,
+        "cacheRead": 300,
+        "cacheCreation": 0,
+        "model": "claude-opus-5-5"
+      }
     }
   ]
 }
