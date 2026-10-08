@@ -55,6 +55,7 @@ trabajando de una colgada, no sabe qué worker de `orq` es cuál y no dice cuán
   - Contra datos reales: tokens de 26 sesiones cuadran con un conteo independiente por `message.id` único; la dedup por "último id" (DD-9) coincide con la de id único en 60 transcripts; RSS 24 MB; workers de orq con plan/task/specialist; timeline de 20 eventos; 0 errores de consola.
   - Bugs que la QA atrapó y los tests de los workers no: el poller nunca llamaba a `Usage` (0 sesiones con tokens), lectura entera en RAM de transcripts de hasta 112 MB, fixture de timeline fuera del embed.
   - Primer lote con los fixes de orq de `a26b57a` en `orquestar-sesiones`: los workers cerraron sus tasks en sus worktrees y `main` quedó limpio.
-- **NO verificado:** notificación real de Windows (headless sin permiso; lógica cubierta por tests de node), `stale` con una sesión realmente colgada (cubierto por test), modo oscuro de lo nuevo.
+- **Verificado después del cierre (2026-10-08):** reconexión del SSE con la página abierta — `systemctl --user stop`, 6 s, `start`: el indicador pasó conectado → desconectado → conectado (~9 s) sin recargar, las tarjetas se mantuvieron; solo 2 `ERR_CONNECTION_REFUSED` de los reintentos. Modo oscuro de lo nuevo (fixture): contraste mínimo 6,4:1 (tokens), resto 9-15:1, panel incluido (WCAG AA = 4,5).
+- **NO verificado:** notificación real de Windows (headless sin permiso; lógica cubierta por tests de node), `stale` con una sesión realmente colgada (cubierto por test), arranque en frío tras reiniciar WSL.
 - **Quedó afuera:** lo de §4. Sin tasks `skipped`.
 - **Continúa en:** —
