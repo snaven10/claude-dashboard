@@ -4,7 +4,7 @@
 - **Especialista:** claude-dashboard-worker
 - **Proyecto:** claude-dashboard (`~/personal/claude-dashboard`), rama `main`
 - **Depende de:** TASK-003
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -34,8 +34,7 @@
 
 ## Resultado
 <!-- SE LLENA AL CERRAR (estado done/skipped). Vacío mientras esté pending. -->
-- **Estado final:**
-- **Resumen:**
-- **Archivos tocados:**
-- **Verificado por:**
-
+- **Estado final:** done
+- **Resumen:** Makefile (build/test/install/uninstall), unidad systemd --user (PATH explícito, Restart=on-failure), README, y `project` = repo (no worktree) vía `projectName` en agents.go: sube buscando `.git`; dir → basename; archivo `gitdir:` con `/.git/worktrees/` → basename del repo; si falla → basename(cwd). Sin ejecutar git, cache por cwd (sync.Map).
+- **Archivos tocados:** `Makefile`, `deploy/claude-dashboard.service`, `README.md`, `internal/agents/agents.go`, `internal/agents/agents_test.go`. Commits `146f91e` y `a2109d8` en rama feature/plan-1-task-005 (worktree plan-1-task-005).
+- **Verificado por:** `gofmt -l .` vacío; `go vet ./...` limpio; `go test -race ./...` ok (agents, server, transcript) incl. `TestProjectName` (repo, subdir, worktree, subdir de worktree, .git ajeno, sin repo, cwd vacío). `make -n install uninstall` revisado. QA del orquestador (2026-10-08): la unidad traía `After=default.target` + `WantedBy=default.target` (ciclo de orden; systemd lo rompe borrando un job) → corregido en `a2109d8`. `make install` real: servicio `active`+`enabled`, `curl localhost:7777/api/sessions` responde 27 sesiones sin terminal extra, ciclo 413-442 ms, `systemd-analyze --user verify` limpio; el worker vivo en worktree sale como `claude-dashboard`. `make uninstall`: sin binario, unidad, symlink en `default.target.wants`, puerto ni proceso — estado idéntico al previo. Límite conocido: sesiones cuyo worktree ya se borró caen a basename(cwd).
