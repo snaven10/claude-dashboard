@@ -478,3 +478,38 @@ func TestTimelineRoute(t *testing.T) {
 		t.Errorf("out=%+v cwd=%q id=%q", out, gotCwd, gotID)
 	}
 }
+
+// El poller tiene que llamar a Usage: el acumulador estaba testeado pero nadie lo
+// invocaba y /api/sessions salía sin tokens con datos reales (QA PLAN-002).
+func TestSessionsCarryTokens(t *testing.T) {
+	s := newTestServer(func(context.Context) ([]agents.Session, error) { return fakeSessions(2), nil })
+	s.Usage = func(cwd, id string) (*transcript.Tokens, error) {
+		if strings.HasSuffix(id, "1") {
+			return nil, errors.New("roto") // un fallo de tokens no tumba la sesión ni el resumen
+		}
+		return &transcript.Tokens{Input: 1, Output: 2, CacheRead: 3, CacheCreation: 4, Model: "m"}, nil
+	}
+	if _, err := s.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	s.mu.Lock()
+	got := append([]agents.Session(nil), s.sessions...)
+	s.mu.Unlock()
+	var con, sin int
+	for _, ss := range got {
+		if ss.Title == "" {
+			t.Errorf("%s perdió el resumen", ss.SessionID)
+		}
+		if ss.Tokens != nil {
+			con++
+			if *ss.Tokens != (agents.Tokens{Input: 1, Output: 2, CacheRead: 3, CacheCreation: 4, Model: "m"}) {
+				t.Errorf("tokens = %+v", *ss.Tokens)
+			}
+		} else {
+			sin++
+		}
+	}
+	if con != 1 || sin != 1 {
+		t.Errorf("con tokens %d, sin tokens %d; esperaba 1 y 1", con, sin)
+	}
+}

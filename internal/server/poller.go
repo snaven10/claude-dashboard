@@ -48,12 +48,21 @@ func (s *Server) build(ctx context.Context) ([]agents.Session, error) {
 		go func(ss *agents.Session) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			d, err := s.Summary(ss.Cwd, ss.SessionID)
-			if err != nil {
-				s.logf("transcript %s: %v", ss.SessionID, err)
-				return
+			if s.Summary != nil {
+				if d, err := s.Summary(ss.Cwd, ss.SessionID); err != nil {
+					s.logf("transcript %s: %v", ss.SessionID, err)
+				} else {
+					applyDetail(ss, d)
+				}
 			}
-			applyDetail(ss, d)
+			// Tokens independientes del resumen: un fallo de uno no apaga el otro.
+			if s.Usage != nil {
+				if t, err := s.Usage(ss.Cwd, ss.SessionID); err != nil {
+					s.logf("tokens %s: %v", ss.SessionID, err)
+				} else {
+					ss.Tokens = (*agents.Tokens)(t) // mismos campos: conversión directa
+				}
+			}
 		}(&sessions[i])
 	}
 	wg.Wait()
