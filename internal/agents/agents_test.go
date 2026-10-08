@@ -24,8 +24,8 @@ func listByName(t *testing.T) map[string]Session {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 6 {
-		t.Fatalf("esperaba 6 sesiones, hay %d", len(got))
+	if len(got) != 7 {
+		t.Fatalf("esperaba 7 sesiones, hay %d", len(got))
 	}
 	m := map[string]Session{}
 	for _, s := range got {
@@ -39,6 +39,8 @@ func TestListNormalizacion(t *testing.T) {
 	want := map[string]string{
 		"a": StatusBusy, "b": StatusIdle, "c": StatusWaiting,
 		"d": StatusBlocked, "e": StatusBusy, "f": StatusDone,
+		// Forma real de una background terminada: state manda sobre status.
+		"g": StatusDone,
 	}
 	for n, st := range want {
 		if byName[n].Status != st {

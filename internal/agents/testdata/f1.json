@@ -4,5 +4,6 @@
   {"sessionId":"cccc3333-0000-0000-0000-000000000003","pid":103,"cwd":"/tmp/demo/proj-c","kind":"interactive","name":"c","startedAt":3000,"status":"waiting","waitingFor":"input needed"},
   {"id":"dddd4444","sessionId":"dddd4444-0000-0000-0000-000000000004","cwd":"/tmp/demo/proj-d","kind":"background","name":"d","startedAt":4000,"state":"blocked"},
   {"id":"eeee5555","sessionId":"eeee5555-0000-0000-0000-000000000005","pid":105,"cwd":"/tmp/demo/proj-e","kind":"background","name":"e","startedAt":5000,"state":"working","status":"busy"},
-  {"id":"ffff6666","sessionId":"ffff6666-0000-0000-0000-000000000006","cwd":"/tmp/demo/proj-f","kind":"background","name":"f","startedAt":6000,"state":"completed"}
+  {"id":"ffff6666","sessionId":"ffff6666-0000-0000-0000-000000000006","cwd":"/tmp/demo/proj-f","kind":"background","name":"f","startedAt":6000,"state":"completed"},
+  {"id":"gggg7777","sessionId":"gggg7777-0000-0000-0000-000000000007","pid":107,"cwd":"/tmp/demo/proj-g","kind":"background","name":"g","startedAt":7000,"state":"done","status":"idle"}
 ]
