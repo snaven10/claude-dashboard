@@ -16,7 +16,9 @@ install: build
 	install -m 0755 bin/$(BIN) $(BINDIR)/$(BIN)
 	install -m 0644 deploy/$(UNIT) $(UNITDIR)/$(UNIT)
 	systemctl --user daemon-reload
-	systemctl --user enable --now $(UNIT)
+	systemctl --user enable $(UNIT)
+# restart y no enable --now: si ya corría, enable --now deja el binario viejo vivo
+	systemctl --user restart $(UNIT)
 
 uninstall:
 	-systemctl --user disable --now $(UNIT)
