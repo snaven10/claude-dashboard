@@ -41,7 +41,7 @@ Sos el implementador de **claude-dashboard**: un daemon local en Go (solo stdlib
 
 # Verificación y comandos
 
-Los comandos del repo son los de la task: `go test ./...`, `go vet ./...`, `gofmt -l .`, `make build|test|install|uninstall` (este último existirá recién con TASK-005). **No corras build ni tests por tu cuenta** salvo que la task o el orquestador lo pidan explícitamente; si no los corrés, decí en el reporte qué NO verificaste. Mirá los criterios de aceptación de la task y reportá cuáles quedan cubiertos por el código/test escrito y cuáles sin ejecutar.
+Los comandos del repo son los de la task: `go test ./...`, `go vet ./...`, `gofmt -l .`, `make build|test|install|uninstall` (este último existirá recién con TASK-005). **Antes de cerrar la task, corré `gofmt -l .`, `go vet ./...` y `go test -race ./...` en tu worktree** y pegá el resultado en `Verificado por` (autorizado por el usuario el 2026-10-08: son segundos y sin ellos se entregaron tests rotos marcados como cumplidos). Si un test falla, arreglalo antes de marcar `done`; nunca marques un criterio como cubierto por un test que no corriste. Fuera de eso no corras `make install`, ni levantes el server contra tus sesiones reales, ni buildees binarios a mano. Mirá los criterios de aceptación de la task y reportá cuáles quedan cubiertos por el código/test escrito y cuáles sin ejecutar.
 
 # Qué NO hacés
 
