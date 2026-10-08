@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -16,6 +18,7 @@ import (
 	"time"
 
 	"claude-dashboard/internal/agents"
+	"claude-dashboard/internal/orq"
 	"claude-dashboard/internal/transcript"
 )
 
@@ -343,4 +346,135 @@ func TestListenAndServeShutdown(t *testing.T) {
 		t.Fatal("shutdown colgado")
 	}
 	wg.Wait()
+}
+
+func TestOrqJoinAndBrokenJobs(t *testing.T) {
+	sess := fakeSessions(2)
+	sess[0].Name = "w-006"
+	sess[1].Name = "otra"
+	s := newTestServer(func(context.Context) ([]agents.Session, error) { return sess, nil })
+	s.Orq = func() (map[string]orq.Job, error) {
+		return map[string]orq.Job{"w-006": {ID: "9efa2c1a", Key: "claude-dashboard/p2-task006", WS: "claude-dashboard", Specialist: "claude-dashboard-worker", Bgname: "w-006"}}, nil
+	}
+	got, err := s.build(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	o := got[0].Orq
+	if o == nil || o.Job != "9efa2c1a" || o.Plan == nil || *o.Plan != "2" || o.Task == nil || *o.Task != "006" ||
+		o.Specialist != "claude-dashboard-worker" || o.WS != "claude-dashboard" {
+		t.Errorf("orq: %+v", o)
+	}
+	if got[1].Orq != nil {
+		t.Errorf("no es worker: %+v", got[1].Orq)
+	}
+
+	// jobs.json roto: Load devuelve error + mapa vacío; /api/sessions sigue andando
+	s2 := newTestServer(func(context.Context) ([]agents.Session, error) { return fakeSessions(1), nil })
+	dir := t.TempDir()
+	bad := filepath.Join(dir, "jobs.json")
+	if err := os.WriteFile(bad, []byte("{roto"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s2.Orq = func() (map[string]orq.Job, error) { return orq.Load(bad) }
+	ts := httptest.NewServer(s2.Handler())
+	defer ts.Close()
+	resp, err := http.Get(ts.URL + "/api/sessions")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("status %d con jobs.json roto", resp.StatusCode)
+	}
+	var snap Snapshot
+	if err := json.NewDecoder(resp.Body).Decode(&snap); err != nil || len(snap.Sessions) != 1 || snap.Sessions[0].Orq != nil {
+		t.Fatalf("snap=%+v err=%v", snap, err)
+	}
+}
+
+func TestStaleAndHashStable(t *testing.T) {
+	now := time.UnixMilli(10_000_000)
+	old := now.Add(-11 * time.Minute).UnixMilli()
+	recent := now.Add(-1 * time.Minute).UnixMilli()
+	sess := fakeSessions(3)
+	sess[0].Status, sess[0].LastActivityAt = "busy", old    // stale
+	sess[1].Status, sess[1].LastActivityAt = "idle", old    // idle viejo: no
+	sess[2].Status, sess[2].LastActivityAt = "busy", recent // busy reciente: no
+	s := newTestServer(func(context.Context) ([]agents.Session, error) {
+		out := make([]agents.Session, len(sess))
+		copy(out, sess)
+		return out, nil
+	})
+	s.Summary = nil // que lastActivityAt quede como lo puse
+	s.StaleAfter = 10 * time.Minute
+	cur := now
+	s.Now = func() time.Time { return cur }
+
+	got, err := s.build(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got[0].Stale || got[1].Stale || got[2].Stale {
+		t.Errorf("stale = %v %v %v, quiero true false false", got[0].Stale, got[1].Stale, got[2].Stale)
+	}
+
+	changed, err := s.Refresh(context.Background())
+	if err != nil || !changed {
+		t.Fatalf("1er ciclo: %v %v", changed, err)
+	}
+	// pasa el tiempo sin cambios reales (ninguna sesión cruza el umbral): no emite
+	cur = cur.Add(30 * time.Second)
+	if changed, err := s.Refresh(context.Background()); err != nil || changed {
+		t.Errorf("ciclo sin cambios emitió: %v %v", changed, err)
+	}
+	// ahora la reciente cruza el umbral: cambia el valor de stale y recién ahí emite
+	cur = cur.Add(10 * time.Minute)
+	if changed, err := s.Refresh(context.Background()); err != nil || !changed {
+		t.Errorf("cambio de stale no emitió: %v %v", changed, err)
+	}
+}
+
+func TestTimelineRoute(t *testing.T) {
+	s := newTestServer(func(context.Context) ([]agents.Session, error) { return fakeSessions(1), nil })
+	var gotCwd, gotID string
+	s.Timeline = func(cwd, id string) ([]transcript.Event, error) {
+		gotCwd, gotID = cwd, id
+		return []transcript.Event{{At: 1, Kind: "prompt", Text: "a"}, {At: 2, Kind: "tool", Text: "Bash: x"}}, nil
+	}
+	ts := httptest.NewServer(s.Handler())
+	defer ts.Close()
+
+	for _, bad := range []string{"no-esta", "..%2F..%2Fetc%2Fpasswd", "sess-99"} {
+		r, err := http.Get(ts.URL + "/api/sessions/" + bad + "/timeline")
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Body.Close()
+		if r.StatusCode != 404 {
+			t.Errorf("%s: status %d, quiero 404", bad, r.StatusCode)
+		}
+	}
+	if gotID != "" {
+		t.Errorf("Timeline se llamó con un id fuera del snapshot: %q", gotID)
+	}
+
+	r, err := http.Get(ts.URL + "/api/sessions/sess-00/timeline")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Body.Close()
+	if r.StatusCode != 200 {
+		t.Fatalf("status %d", r.StatusCode)
+	}
+	var out struct {
+		SessionID string
+		Events    []transcript.Event
+	}
+	if err := json.NewDecoder(r.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.SessionID != "sess-00" || len(out.Events) != 2 || out.Events[0].Kind != "prompt" || gotCwd != "/work/demo" || gotID != "sess-00" {
+		t.Errorf("out=%+v cwd=%q id=%q", out, gotCwd, gotID)
+	}
 }

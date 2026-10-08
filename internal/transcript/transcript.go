@@ -385,3 +385,120 @@ func truncate(s string, n int) string {
 	}
 	return string(r[:n])
 }
+
+// maxTimeline es la cantidad de eventos que devuelve Timeline.
+const maxTimeline = 20
+
+// Event es un evento de la línea de tiempo de una sesión.
+type Event struct {
+	At   int64  `json:"at"`   // ms epoch; 0 si el transcript no trae timestamp
+	Kind string `json:"kind"` // "prompt" | "tool" | "text"
+	Text string `json:"text"`
+}
+
+// Timeline devuelve los últimos 20 eventos (del más viejo al más nuevo) leyendo
+// solo la cola (DD-3). Sin transcript → lista vacía y error nil.
+func Timeline(cwd, sessionID string) ([]Event, error) {
+	root, err := projectsRoot()
+	if err != nil {
+		return nil, err
+	}
+	path := findPath(root, cwd, sessionID)
+	if path == "" {
+		return []Event{}, nil
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return []Event{}, nil
+		}
+		return nil, fmt.Errorf("abriendo %s: %w", path, err)
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("stat %s: %w", path, err)
+	}
+	size := st.Size()
+
+	window := int64(initialWindow)
+	for {
+		if window > size {
+			window = size
+		}
+		buf := make([]byte, window)
+		n, err := f.ReadAt(buf, size-window)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return nil, fmt.Errorf("leyendo %s: %w", path, err)
+		}
+		bytesRead.Add(int64(n))
+		data := buf[:n]
+		if window < size { // primera línea parcial
+			if i := bytes.IndexByte(data, '\n'); i >= 0 {
+				data = data[i+1:]
+			} else {
+				data = nil
+			}
+		}
+		events := parseEvents(data)
+		if len(events) >= maxTimeline || window >= size || window >= maxWindow {
+			if len(events) > maxTimeline {
+				events = events[len(events)-maxTimeline:]
+			}
+			return events, nil
+		}
+		window *= 2
+		if window > maxWindow {
+			window = maxWindow
+		}
+	}
+}
+
+// parseEvents recorre las líneas en orden y arma los eventos. Los mensajes
+// del harness y los tool_result no cuentan como prompts.
+func parseEvents(data []byte) []Event {
+	events := []Event{}
+	for _, raw := range bytes.Split(data, []byte{'\n'}) {
+		raw = bytes.TrimSpace(raw)
+		if len(raw) == 0 {
+			continue
+		}
+		var l line
+		if json.Unmarshal(raw, &l) != nil {
+			continue
+		}
+		at := parseTime(l.Timestamp)
+		switch l.Type {
+		case "user":
+			if l.IsMeta {
+				continue
+			}
+			if text, ok := realUserText(l.Message.Content); ok {
+				events = append(events, Event{At: at, Kind: "prompt", Text: truncate(text, maxPrompt)})
+			}
+		case "assistant":
+			var blocks []block
+			if json.Unmarshal(l.Message.Content, &blocks) != nil {
+				continue
+			}
+			for _, b := range blocks {
+				switch b.Type {
+				case "tool_use":
+					if b.Name == "" {
+						continue
+					}
+					t := b.Name
+					if sum := summarizeInput(b.Input); sum != "" {
+						t += ": " + sum
+					}
+					events = append(events, Event{At: at, Kind: "tool", Text: truncate(t, maxAction)})
+				case "text":
+					if t := strings.TrimSpace(b.Text); t != "" {
+						events = append(events, Event{At: at, Kind: "text", Text: truncate(t, maxAction)})
+					}
+				}
+			}
+		}
+	}
+	return events
+}
