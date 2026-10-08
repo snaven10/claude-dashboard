@@ -293,3 +293,26 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 .ev-text { flex-basis: 100%; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 30vh; overflow: auto; }
 .ev-tool .ev-text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8rem; }
 .ev-prompt .ev-text { font-weight: 600; }
+
+/* ---- PLAN-003 ---- */
+:root { --warn: #b91c1c; --warn-bg: #fee2e2; }
+@media (prefers-color-scheme: dark) {
+  :root { --warn: #fca5a5; --warn-bg: #450a0a; }
+}
+.context { font-size: 0.8rem; color: var(--muted); overflow-wrap: anywhere; }
+.context.warn { color: var(--warn); background: var(--warn-bg); font-weight: 600; padding: 2px 8px; border-radius: 6px; }
+.badge.rate { align-self: flex-start; color: var(--warn); background: var(--warn-bg); }
+.group-tokens { font-size: 0.8rem; font-weight: 400; color: var(--muted); }
+.old-done { margin-top: 12px; min-width: 0; }
+.old-toggle { width: 100%; text-align: left; white-space: normal; margin-bottom: 8px; }
+.search { display: inline-flex; align-items: center; gap: 4px; }
+.search input {
+  font: inherit;
+  color: var(--fg);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 6px;
+  width: 14rem;
+  max-width: 55vw;
+}

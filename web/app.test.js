@@ -62,3 +62,71 @@ test('orqLabel', () => {
   assert.strictEqual(orqLabel({ plan: null, task: null, specialist: 'w' }), 'w');
   assert.strictEqual(orqLabel(null), '');
 });
+
+const A = require('./app.js');
+
+test('formatContext: normal, con compactaciones, warn y null', () => {
+  assert.strictEqual(A.formatContext({ current: 412000, compactions: 2, warn: false }), 'contexto 412k · compactó 2×');
+  assert.strictEqual(A.formatContext({ current: 90000, compactions: 0, warn: false }), 'contexto 90k');
+  assert.strictEqual(A.formatContext({ current: 850000, compactions: 1, warn: true }), '⚠ contexto 850k, cerca de compactar');
+  assert.strictEqual(A.formatContext(null), '');
+  assert.strictEqual(A.formatContext(undefined), '');
+});
+
+test('contextTitle y rateTitle', () => {
+  assert.match(A.contextTitle({ compactions: 2, lastPreTokens: 967001 }), /compactó en 967k/);
+  assert.doesNotMatch(A.contextTitle({ compactions: 0, lastPreTokens: null }), /compactó en/);
+  assert.strictEqual(A.rateTitle({ windowMin: 5, output: 48000, calls: 31 }), 'En 5 min: 48k tokens de output y 31 llamadas');
+  assert.strictEqual(A.rateTitle(null), '');
+});
+
+test('planTotals suma tokens y tolera tokens null', () => {
+  const list = [
+    { tokens: { input: 1, output: 2, cacheRead: 3, cacheCreation: 4 } },
+    { tokens: null },
+    { tokens: { input: 10, output: 20, cacheRead: 0, cacheCreation: 0 } },
+  ];
+  assert.deepStrictEqual(A.planTotals(list), { total: 40, output: 22 });
+  assert.deepStrictEqual(A.planTotals([]), { total: 0, output: 0 });
+});
+
+test('isOldDone: corte de 24 h, usa startedAt sin lastActivityAt, solo done', () => {
+  const now = 1000 * 86400000;
+  const H = 3600000;
+  assert.strictEqual(A.isOldDone({ status: 'done', lastActivityAt: now - 25 * H }, now), true);
+  assert.strictEqual(A.isOldDone({ status: 'done', lastActivityAt: now - 23 * H }, now), false);
+  assert.strictEqual(A.isOldDone({ status: 'done', lastActivityAt: now - 24 * H }, now), false);
+  assert.strictEqual(A.isOldDone({ status: 'done', lastActivityAt: null, startedAt: now - 48 * H }, now), true);
+  assert.strictEqual(A.isOldDone({ status: 'done' }, now), false);
+  assert.strictEqual(A.isOldDone({ status: 'idle', lastActivityAt: now - 99 * H }, now), false);
+});
+
+test('splitOldDone separa sin perder ni reordenar', () => {
+  const now = 1000 * 86400000;
+  const list = [
+    { id: 'a', status: 'busy', lastActivityAt: 1 },
+    { id: 'b', status: 'done', lastActivityAt: now - 3600000 },
+    { id: 'c', status: 'done', lastActivityAt: now - 3 * 86400000 },
+  ];
+  const r = A.splitOldDone(list, now);
+  assert.deepStrictEqual(r.recent.map((x) => x.id), ['a', 'b']);
+  assert.deepStrictEqual(r.old.map((x) => x.id), ['c']);
+});
+
+test('normalizeText quita tildes y mayúsculas', () => {
+  assert.strictEqual(A.normalizeText('Migración ÁÉÍÓÚ ñ'), 'migracion aeiou n');
+  assert.strictEqual(A.normalizeText(null), '');
+});
+
+test('matchesQuery: campos, tildes, mayúsculas, orq y vacío', () => {
+  const sess = { name: 'bg-lint', title: 'Migración de pagos', lastPrompt: 'Corré el LINTER', project: 'demo-web', orq: { plan: '3', task: '009' } };
+  assert.strictEqual(A.matchesQuery(sess, ''), true);
+  assert.strictEqual(A.matchesQuery(sess, '   '), true);
+  assert.strictEqual(A.matchesQuery(sess, 'MIGRACION'), true);
+  assert.strictEqual(A.matchesQuery(sess, 'corre el linter'), true);
+  assert.strictEqual(A.matchesQuery(sess, 'demo-web'), true);
+  assert.strictEqual(A.matchesQuery(sess, 'plan-3'), true);
+  assert.strictEqual(A.matchesQuery(sess, '009'), true);
+  assert.strictEqual(A.matchesQuery(sess, 'inexistente'), false);
+  assert.strictEqual(A.matchesQuery({ name: 'x' }, 'y'), false);
+});

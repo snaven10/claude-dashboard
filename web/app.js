@@ -71,11 +71,82 @@
     return parts.join(' · ');
   }
 
+  // ---- PLAN-003 ----
+
+  var DAY_MS = 24 * 60 * 60 * 1000;
+
+  // DD-13: "contexto 412k · compactó 2×"; con warn, aviso explícito. null => ''.
+  function formatContext(c) {
+    if (!c || typeof c.current !== 'number') return '';
+    if (c.warn) return '⚠ contexto ' + formatTokens(c.current) + ', cerca de compactar';
+    var t = 'contexto ' + formatTokens(c.current);
+    if (c.compactions > 0) t += ' · compactó ' + c.compactions + '×';
+    return t;
+  }
+
+  function contextTitle(c) {
+    if (!c) return '';
+    var t = 'compactaciones: ' + (c.compactions || 0);
+    if (typeof c.lastPreTokens === 'number') t += ' · la última vez compactó en ' + formatTokens(c.lastPreTokens);
+    return t;
+  }
+
+  function rateTitle(r) {
+    if (!r) return '';
+    return 'En ' + (r.windowMin || 5) + ' min: ' + formatTokens(r.output || 0) + ' tokens de output y ' +
+      (r.calls || 0) + ' llamadas';
+  }
+
+  // DD-16: suma por plan; tokens null cuenta como 0.
+  function planTotals(sessions) {
+    var all = 0;
+    var out = 0;
+    sessions.forEach(function (s) {
+      all += totalTokens(s.tokens);
+      out += s.tokens && s.tokens.output ? s.tokens.output : 0;
+    });
+    return { total: all, output: out };
+  }
+
+  // DD-15: done y última actividad (o inicio) de hace más de 24 h.
+  function isOldDone(s, now) {
+    if (!s || s.status !== 'done') return false;
+    var t = s.lastActivityAt || s.startedAt;
+    if (!t) return false;
+    return now - t > DAY_MS;
+  }
+
+  function splitOldDone(list, now) {
+    var recent = [];
+    var old = [];
+    list.forEach(function (s) { (isOldDone(s, now) ? old : recent).push(s); });
+    return { recent: recent, old: old };
+  }
+
+  // DD-17: minúsculas y sin tildes.
+  function normalizeText(x) {
+    if (x == null) return '';
+    return String(x).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  }
+
+  function matchesQuery(s, q) {
+    var n = normalizeText(q).trim();
+    if (!n) return true;
+    var o = s.orq || {};
+    var fields = [s.name, s.title, s.lastPrompt, s.project, o.plan, o.task];
+    // "plan 3" / "PLAN-3" también deberían encontrar: sumamos las etiquetas
+    fields.push(orqLabel(s.orq));
+    return fields.some(function (f) { return normalizeText(f).indexOf(n) !== -1; });
+  }
+
   if (typeof document === 'undefined') {
     if (typeof module !== 'undefined' && module.exports) {
       module.exports = {
         notifyTargets: notifyTargets, formatTokens: formatTokens, totalTokens: totalTokens,
-        groupByPlan: groupByPlan, orqLabel: orqLabel
+        groupByPlan: groupByPlan, orqLabel: orqLabel,
+        formatContext: formatContext, contextTitle: contextTitle, rateTitle: rateTitle,
+        planTotals: planTotals, isOldDone: isOldDone, splitOldDone: splitOldDone,
+        normalizeText: normalizeText, matchesQuery: matchesQuery
       };
     }
     return;
@@ -85,6 +156,7 @@
   var STORE_KEY = 'claude-dashboard.filters';
   var NOTIFY_KEY = 'claude-dashboard.notify';
   var GROUP_KEY = 'claude-dashboard.groupByPlan';
+  var OLD_KEY = 'claude-dashboard.showOldDone';
   var FIXTURE = new URLSearchParams(location.search).has('fixture');
 
   var STATUS_LABEL = {
@@ -106,6 +178,9 @@
   var sessions = [];
   var prevSessions = null; // null = todavía no hubo primer snapshot
   var groupByPlanOn = readFlag(GROUP_KEY);
+  var showOldOn = readFlag(OLD_KEY);
+  var query = '';
+  var fixtureNow = null; // con ?fixture el "ahora" es generatedAt, para que el corte de 24 h no caduque
   var notifyOn = readFlag(NOTIFY_KEY);
   var lastFocus = null;
   var expanded = new Set();
@@ -201,9 +276,12 @@
     });
   }
 
+  function nowMs() { return FIXTURE && fixtureNow ? fixtureNow : Date.now(); }
+
   function visible(list) {
     return list.filter(function (s) {
       var st = statusOf(s);
+      if (!matchesQuery(s, query)) return false;
       if (filters.project && s.project !== filters.project) return false;
       if (filters.hideDone && st === 'done') return false;
       if (filters.hideIdle && st === 'idle') return false;
@@ -269,6 +347,19 @@
       c.appendChild(tt);
     }
 
+    var ctxText = formatContext(s.context);
+    if (ctxText) {
+      var cx = el('div', 'context' + (s.context.warn ? ' warn' : ''), ctxText);
+      cx.title = contextTitle(s.context);
+      c.appendChild(cx);
+    }
+
+    if (s.rate && s.rate.high) {
+      var rb = el('span', 'badge rate', '⚡ ritmo inusual');
+      rb.title = rateTitle(s.rate);
+      c.appendChild(rb);
+    }
+
     var foot = el('div', 'card-foot');
     var tl = el('button', null, 'línea de tiempo');
     tl.type = 'button';
@@ -315,12 +406,17 @@
     document.title = counts.waiting > 0 ? '(' + counts.waiting + ') esperándote — ' + BASE_TITLE : BASE_TITLE;
 
     var list = sorted(visible(sessions));
+    var parts = splitOldDone(list, nowMs());
+    var nodes = [];
     if (groupByPlanOn) {
-      var nodes = [];
-      groupByPlan(list).forEach(function (g) {
+      groupByPlan(parts.recent).forEach(function (g) {
         var sec = el('section', 'group');
         var h = el('h2', 'group-head', g.plan === null ? 'Sin plan' : 'PLAN-' + g.plan);
         h.appendChild(el('span', 'group-count', g.sessions.length + (g.waiting ? ' · ' + g.waiting + ' esperándote' : '')));
+        var pt = planTotals(g.sessions);
+        var tot = el('span', 'group-tokens', '🔢 ' + formatTokens(pt.total) + ' tokens · output ' + formatTokens(pt.output));
+        tot.title = 'Suma de las sesiones que Claude todavía lista; las borradas con `claude rm` no cuentan.';
+        h.appendChild(tot);
         sec.appendChild(h);
         var inner = el('div', 'grid');
         g.sessions.forEach(function (s) { inner.appendChild(card(s)); });
@@ -328,11 +424,30 @@
         nodes.push(sec);
       });
       grid.className = 'groups';
-      grid.replaceChildren.apply(grid, nodes);
     } else {
       grid.className = 'grid';
-      grid.replaceChildren.apply(grid, list.map(card));
+      nodes = parts.recent.map(card);
     }
+    if (parts.old.length) {
+      var old = el('section', 'old-done');
+      old.style.gridColumn = '1 / -1';
+      var tg = el('button', 'old-toggle', (showOldOn ? '▾ ' : '▸ ') + parts.old.length + ' terminadas hace más de 1 día');
+      tg.type = 'button';
+      tg.setAttribute('aria-expanded', showOldOn ? 'true' : 'false');
+      tg.addEventListener('click', function () {
+        showOldOn = !showOldOn;
+        writeFlag(OLD_KEY, showOldOn);
+        render();
+      });
+      old.appendChild(tg);
+      if (showOldOn) {
+        var og = el('div', 'grid');
+        parts.old.forEach(function (s) { og.appendChild(card(s)); });
+        old.appendChild(og);
+      }
+      nodes.push(old);
+    }
+    grid.replaceChildren.apply(grid, nodes);
     $('empty').hidden = list.length > 0;
   }
 
@@ -429,6 +544,7 @@
     fireNotifications(notifyTargets(prevSessions, next));
     prevSessions = next;
     sessions = next;
+    if (FIXTURE && data && typeof data.generatedAt === 'number') fixtureNow = data.generatedAt;
     updateProjects();
     render();
   }
@@ -469,7 +585,22 @@
     updateNotifyBtn();
     $('timeline-close').addEventListener('click', closeTimeline);
     $('timeline').addEventListener('click', function (ev) { if (ev.target === $('timeline')) closeTimeline(); });
-    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') closeTimeline(); });
+    var search = $('f-search');
+    search.addEventListener('input', function () { query = search.value; render(); });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') {
+        if (!$('timeline').hidden) { closeTimeline(); return; }
+        if (search.value) { search.value = ''; query = ''; render(); }
+        if (document.activeElement === search) search.blur();
+        return;
+      }
+      if (ev.key === '/' && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+        var tag = document.activeElement && document.activeElement.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        ev.preventDefault();
+        search.focus();
+      }
+    });
 
     // refresca los "hace X min" sin esperar un snapshot
     setInterval(render, 30000);
