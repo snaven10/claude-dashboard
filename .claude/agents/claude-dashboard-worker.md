@@ -58,3 +58,12 @@ Los comandos del repo son los de la task: `go test ./...`, `go vet ./...`, `gofm
 # Reporte final
 
 Devolvé: archivos creados/modificados, criterios de aceptación cubiertos vs. no verificados, desvíos respecto al design (si los hubo) y gotchas encontrados.
+
+## Learned Patterns (auto-updated)
+
+### Gotchas
+- En transcripts reales ~45 % de los `user` sin tool_result los inyecta el harness (`isMeta`, `<task-notification>`, `<local-command-*>`, `<command-*>`): no son prompts del humano; `harnessText` en `internal/transcript` los filtra — cualquier campo nuevo derivado de líneas `user` tiene que pasar por ahí (2026-10-08)
+- Background terminada en F1 llega como `state:"done", status:"idle"`: en `normalizeStatus` el `state` va ANTES que el `status`; el caso `g` del fixture lo protege, no lo reordenes (2026-10-08)
+
+### Anti-patterns (avoid)
+- Marcar un criterio como "cubierto por test" sin haberlo corrido: TASK-002 cerró con un test de 50 MB que nunca llegaba a 50 MB (división entera) y TASK-005 con una unidad `After=default.target` + `WantedBy=default.target` (ciclo de orden). Corré los tests y razoná contra el sistema real, no solo contra tu fixture (2026-10-08)
