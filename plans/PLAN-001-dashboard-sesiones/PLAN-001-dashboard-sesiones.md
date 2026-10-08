@@ -1,7 +1,7 @@
 # PLAN-001 — Dashboard local de sesiones Claude Code
 
 **Fecha:** 2026-10-08
-**Fase:** 2 (Execution) — 5/5 tasks done; falta el verify y cierre del PLAN
+**Fase:** Cerrado
 **Diseño:** [`PLAN-001-design.md`](./PLAN-001-design.md)
 **Proyectos:** claude-dashboard (`~/personal/claude-dashboard`)
 **Origen:** pedido del usuario — ver en un navegador qué hace cada sesión de Claude Code y en qué estado está
@@ -52,4 +52,14 @@ vistazo cuál está trabajando, cuál terminó y cuál está **trabada esperánd
 - Integrar con `orq` (mostrar tokens, olas). Candidato a PLAN-002.
 
 ## 5. Cierre
-<!-- SE LLENA AL CERRAR EL PLAN -->
+- **Cerrado:** 2026-10-08
+- **Shipeó:** rama `main` (sin remoto). Merges `2fc7342` TASK-001, `bab4775` TASK-004, `a68187c` TASK-002, `5cba136` TASK-003, `d2bba59` TASK-005. Instalado como servicio `systemd --user` (`claude-dashboard.service`, `enabled`), sirviendo `http://localhost:7777`.
+- **Verificación:**
+  - Cada task con su `## Resultado` y QA del orquestador (vet, `go test -race`, pruebas de mutación donde había un orden o filtro que proteger).
+  - Smoke end-to-end contra el servicio instalado (Playwright): 27 sesiones reales, orden de urgencia correcto, indicador `conectado`, título `(5) esperándote`, sin scroll horizontal, consola limpia. Poller 403-475 ms por ciclo con 25-27 sesiones (límite 1,5 s).
+  - Criterios cruzados del design: DD-4 un solo poller y emisión solo si cambia (log `sin cambios`); DD-7 `-addr 0.0.0.0` rechazado; DD-6 normalización con la forma real de una background terminada (`state:"done", status:"idle"`).
+  - `make install` / `make uninstall` probados de verdad: el uninstall deja la máquina idéntica a antes.
+  - Bugs que la QA atrapó y los tests del worker no: test de 50 MB que nunca llegaba a 50 MB (TASK-002), `lastPrompt` tomando mensajes inyectados por el harness (~45 % de los `user` reales, TASK-002), ciclo de orden `After=`/`WantedBy=default.target` en la unidad (TASK-005).
+- **NO verificado:** íconos emoji en un navegador real (headless los muestra como cuadros); reconexión del SSE tras reiniciar el servicio con el navegador abierto; arranque en frío con un reinicio real de WSL. Sesiones cuyo worktree ya fue borrado muestran `project` = nombre del worktree (sin `.git` no hay de dónde sacar el repo).
+- **Quedó afuera:** lo listado en §4. Sin tasks `skipped`.
+- **Continúa en:** candidato PLAN-002 — integración con `orq` (tokens, olas) y hooks si 3 s de latencia no alcanzan. Los huecos de `orq` detectados acá (`tras_merge` no destruye, `harvest` no commitea cierres, `orq status` con jobs de `bgid` vacío como `busy`) van al repo de `orquestar-sesiones`.
