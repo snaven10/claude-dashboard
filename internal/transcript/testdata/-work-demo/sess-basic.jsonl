@@ -1,0 +1,12 @@
+{"type":"mode","mode":"normal"}
+{"type":"user","timestamp":"2026-01-01T10:00:00.000Z","message":{"role":"user","content":"primer prompt viejo"}}
+{"type":"ai-title","aiTitle":"Titulo viejo"}
+{"type":"assistant","timestamp":"2026-01-01T10:00:05.000Z","message":{"role":"assistant","content":[{"type":"text","text":"Voy a mirar"},{"type":"tool_use","name":"Read","input":{"file_path":"/tmp/x.go"}}]}}
+{"type":"user","timestamp":"2026-01-01T10:01:00.000Z","message":{"role":"user","content":[{"type":"text","text":"arreglá el <b>bug</b> de login"}]}}
+esta linea no es json {{{
+{"type":"ai-title","aiTitle":"Arreglar login"}
+{"type":"assistant","timestamp":"2026-01-01T10:01:10.000Z","message":{"role":"assistant","content":[{"type":"text","text":"Corro los tests"},{"type":"tool_use","name":"Bash","input":{"command":"go test\n ./...","description":"tests"}}]}}
+{"type":"user","timestamp":"2026-01-01T10:01:20.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"ok"}]}}
+{"type":"last-prompt","lastPrompt":"arreglá el <b>bug</b> de login"}
+{"type":"user","isMeta":true,"message":{"role":"user","content":[{"type":"text","text":"contenido de skill inyectado"}]}}
+{"type":"user","message":{"role":"user","content":"<task-notification>\n<task-id>x</task-id>\n</task-notification>"}}
