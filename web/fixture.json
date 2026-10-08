@@ -34,6 +34,19 @@
         "cacheRead": 1150000,
         "cacheCreation": 45000,
         "model": "claude-opus-5-5"
+      },
+      "context": {
+        "current": 412000,
+        "compactions": 2,
+        "lastCompactAt": 1791473112278,
+        "lastPreTokens": 967001,
+        "warn": false
+      },
+      "rate": {
+        "windowMin": 5,
+        "output": 3000,
+        "calls": 4,
+        "high": false
       }
     },
     {
@@ -63,7 +76,15 @@
         "cacheRead": 0,
         "cacheCreation": 0,
         "model": "claude-sonnet-5-5"
-      }
+      },
+      "context": {
+        "current": 850000,
+        "compactions": 0,
+        "lastCompactAt": null,
+        "lastPreTokens": null,
+        "warn": true
+      },
+      "rate": null
     },
     {
       "id": "c3d4e5f6",
@@ -92,7 +113,9 @@
         "specialist": "claude-dashboard-worker",
         "ws": "claude-dashboard"
       },
-      "tokens": null
+      "tokens": null,
+      "context": null,
+      "rate": null
     },
     {
       "id": "d4e5f6a7",
@@ -115,7 +138,9 @@
       },
       "stale": false,
       "orq": null,
-      "tokens": null
+      "tokens": null,
+      "context": null,
+      "rate": null
     },
     {
       "id": "e5f6a7b8",
@@ -150,7 +175,9 @@
         "cacheRead": 0,
         "cacheCreation": 0,
         "model": ""
-      }
+      },
+      "context": null,
+      "rate": null
     },
     {
       "id": "f6a7b8c9",
@@ -185,7 +212,91 @@
         "cacheRead": 300,
         "cacheCreation": 0,
         "model": "claude-opus-5-5"
+      },
+      "context": {
+        "current": 120000,
+        "compactions": 1,
+        "lastCompactAt": 1791469512278,
+        "lastPreTokens": 988000,
+        "warn": false
+      },
+      "rate": {
+        "windowMin": 5,
+        "output": 48000,
+        "calls": 31,
+        "high": true
       }
+    },
+    {
+      "id": "a7b8c9d0",
+      "sessionId": "a7b8c9d0-0000-4000-8000-000000000007",
+      "pid": 0,
+      "kind": "background",
+      "name": "bg-migracion",
+      "cwd": "/home/user/demo-api",
+      "project": "demo-api",
+      "status": "done",
+      "waitingFor": null,
+      "startedAt": 1791468912278,
+      "lastActivityAt": 1791469512278,
+      "remote": false,
+      "stale": false,
+      "title": "Migración reciente (done hace 2 h)",
+      "lastPrompt": "Migrá el esquema a la v3.",
+      "lastAction": {
+        "kind": "text",
+        "text": "Migración aplicada."
+      },
+      "orq": {
+        "job": "11aa22bb",
+        "plan": "1",
+        "task": "006",
+        "specialist": "claude-dashboard-worker",
+        "ws": "claude-dashboard"
+      },
+      "tokens": {
+        "input": 100,
+        "output": 2000,
+        "cacheRead": 5000,
+        "cacheCreation": 0,
+        "model": "claude-sonnet-5-5"
+      },
+      "context": {
+        "current": 90000,
+        "compactions": 0,
+        "lastCompactAt": null,
+        "lastPreTokens": null,
+        "warn": false
+      },
+      "rate": null
+    },
+    {
+      "id": "b8c9d0e1",
+      "sessionId": "b8c9d0e1-0000-4000-8000-000000000008",
+      "pid": 0,
+      "kind": "background",
+      "name": "bg-vieja",
+      "cwd": "/home/user/docs",
+      "project": "docs",
+      "status": "done",
+      "waitingFor": null,
+      "startedAt": 1791044712278,
+      "lastActivityAt": null,
+      "remote": false,
+      "stale": false,
+      "title": "Terminada vieja sin lastActivityAt (usa startedAt)",
+      "lastPrompt": "Generá el changelog.",
+      "lastAction": null,
+      "orq": {
+        "job": "33cc44dd",
+        "plan": "1",
+        "task": "002",
+        "specialist": "reviewer",
+        "ws": "claude-dashboard"
+      },
+      "tokens": null,
+      "context": null,
+      "rate": null
     }
   ]
 }
