@@ -1,7 +1,7 @@
 # PLAN-002 — Alertas, workers de orq, tokens y línea de tiempo
 
 **Fecha:** 2026-10-08
-**Fase:** 1 (Planning) — pendiente de aprobación
+**Fase:** Cerrado
 **Diseño:** [`PLAN-002-design.md`](./PLAN-002-design.md)
 **Proyectos:** claude-dashboard (`~/personal/claude-dashboard`)
 **Origen:** pedido del usuario tras cerrar PLAN-001 — features 1 a 5 de la propuesta (remota descartado: hoy no se usa)
@@ -32,8 +32,8 @@ trabajando de una colgada, no sabe qué worker de `orq` es cuál y no dice cuán
 ## 3. Tasks y orden
 | Task | Qué | Especialista | Modelo | Depende de | Estado |
 |------|-----|--------------|--------|------------|--------|
-| **TASK-006** | Backend: `stale`, `orq`, `tokens` en `Session` + `GET /api/sessions/{id}/timeline` | claude-dashboard-worker | sonnet | contrato del design | `pending` |
-| **TASK-007** | Frontend: avisos, badge sin actividad, datos y agrupación orq, tokens, panel de línea de tiempo | claude-dashboard-worker | sonnet | contrato del design (no código) | `pending` |
+| **TASK-006** | Backend: `stale`, `orq`, `tokens` en `Session` + `GET /api/sessions/{id}/timeline` | claude-dashboard-worker | sonnet | contrato del design | `done` |
+| **TASK-007** | Frontend: avisos, badge sin actividad, datos y agrupación orq, tokens, panel de línea de tiempo | claude-dashboard-worker | sonnet | contrato del design (no código) | `done` |
 
 ### Paralelismo
 
@@ -48,4 +48,13 @@ trabajando de una colgada, no sabe qué worker de `orq` es cuál y no dice cuán
 - Persistir históricos de tokens entre reinicios del servicio.
 
 ## 5. Cierre
-<!-- SE LLENA AL CERRAR EL PLAN -->
+- **Cerrado:** 2026-10-08
+- **Shipeó:** rama `main` (sin remoto). Merges `07e2829` TASK-006 y `57bf121` TASK-007; fixes de QA `28232d5` (embed) y `1eb8457` (poller llama a `Usage`); `d5eb269` (tokens por bloques) entró con TASK-006. Servicio reinstalado con `make install`.
+- **Verificación:**
+  - `go test -race` en 4 paquetes + 8 tests de node, en `main` tras el merge (código idéntico al de la rama de integración que pasó QA).
+  - Contra datos reales: tokens de 26 sesiones cuadran con un conteo independiente por `message.id` único; la dedup por "último id" (DD-9) coincide con la de id único en 60 transcripts; RSS 24 MB; workers de orq con plan/task/specialist; timeline de 20 eventos; 0 errores de consola.
+  - Bugs que la QA atrapó y los tests de los workers no: el poller nunca llamaba a `Usage` (0 sesiones con tokens), lectura entera en RAM de transcripts de hasta 112 MB, fixture de timeline fuera del embed.
+  - Primer lote con los fixes de orq de `a26b57a` en `orquestar-sesiones`: los workers cerraron sus tasks en sus worktrees y `main` quedó limpio.
+- **NO verificado:** notificación real de Windows (headless sin permiso; lógica cubierta por tests de node), `stale` con una sesión realmente colgada (cubierto por test), modo oscuro de lo nuevo.
+- **Quedó afuera:** lo de §4. Sin tasks `skipped`.
+- **Continúa en:** —
