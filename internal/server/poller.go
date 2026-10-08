@@ -34,7 +34,7 @@ func (s *Server) build(ctx context.Context) ([]agents.Session, error) {
 	}
 	jobs := s.loadOrq()
 	now := s.now()
-	if s.Summary == nil && s.Usage == nil {
+	if s.Summary == nil && s.Usage == nil && s.Activity == nil {
 		for i := range sessions {
 			s.enrich(&sessions[i], jobs, now)
 		}
@@ -61,6 +61,14 @@ func (s *Server) build(ctx context.Context) ([]agents.Session, error) {
 					s.logf("tokens %s: %v", ss.SessionID, err)
 				} else {
 					ss.Tokens = (*agents.Tokens)(t) // mismos campos: conversión directa
+				}
+			}
+			// Contexto y ritmo: misma pasada incremental del acumulador (no relee el archivo).
+			if s.Activity != nil {
+				if c, r, err := s.Activity(ss.Cwd, ss.SessionID, now); err != nil {
+					s.logf("actividad %s: %v", ss.SessionID, err)
+				} else {
+					s.applyActivity(ss, c, r)
 				}
 			}
 		}(&sessions[i])
@@ -105,6 +113,24 @@ func (s *Server) enrich(ss *agents.Session, jobs map[string]orq.Job, now time.Ti
 	}
 	ss.Stale = s.StaleAfter > 0 && ss.Status == agents.StatusBusy && ss.LastActivityAt > 0 &&
 		now.UnixMilli()-ss.LastActivityAt > s.StaleAfter.Milliseconds()
+}
+
+// applyActivity pasa contexto y ritmo al contrato aplicando los umbrales (DD-13, DD-14).
+// El hash solo cambia si cambian los números o `warn`/`high`: no hay contadores de tiempo.
+func (s *Server) applyActivity(ss *agents.Session, c *transcript.Context, r *transcript.Rate) {
+	if c != nil {
+		ss.Context = &agents.Context{
+			Current: c.Current, Compactions: c.Compactions,
+			LastCompactAt: c.LastCompactAt, LastPreTokens: c.LastPreTokens,
+			Warn: s.ContextWarn > 0 && c.Current >= s.ContextWarn,
+		}
+	}
+	if r != nil {
+		ss.Rate = &agents.Rate{
+			WindowMin: r.WindowMin, Output: r.Output, Calls: r.Calls,
+			High: (s.RateOutput > 0 && r.Output > s.RateOutput) || (s.RateCalls > 0 && r.Calls > s.RateCalls),
+		}
+	}
 }
 
 func applyDetail(ss *agents.Session, d transcript.Detail) {

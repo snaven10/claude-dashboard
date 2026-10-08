@@ -38,6 +38,47 @@ type usageState struct {
 	totals        Tokens
 	lastMessageID string
 	counted       bool // hubo al menos un mensaje con usage
+
+	// PLAN-003 (DD-13, DD-14): contexto, compactaciones y cola para el ritmo.
+	lastContext   int64
+	compactions   int
+	lastCompactAt int64 // ms; 0 = nunca
+	lastPreTokens int64
+	recent        []rateEntry // mensajes únicos de los últimos 10 min (respecto del más nuevo)
+}
+
+// rateEntry es el output de un mensaje del asistente con su timestamp (ms).
+type rateEntry struct {
+	at  int64
+	out int64
+}
+
+const (
+	rateKeep      = 10 * time.Minute // cuánto se guarda en la cola
+	rateWindowMin = 5                // ventana del ritmo, en minutos
+)
+
+// Context es el contexto actual de la sesión y su historial de compactaciones (DD-13).
+// LastCompactAt y LastPreTokens son nil si nunca compactó. El umbral `warn` lo aplica el server.
+type Context struct {
+	Current       int64  `json:"current"`
+	Compactions   int    `json:"compactions"`
+	LastCompactAt *int64 `json:"lastCompactAt"`
+	LastPreTokens *int64 `json:"lastPreTokens"`
+}
+
+// Rate es la actividad de la ventana de 5 min (DD-14). El umbral `high` lo aplica el server.
+type Rate struct {
+	WindowMin int   `json:"windowMin"`
+	Output    int64 `json:"output"`
+	Calls     int   `json:"calls"`
+}
+
+// usageResult es la vista consistente del acumulador tras una pasada.
+type usageResult struct {
+	tokens  *Tokens
+	context *Context
+	rate    *Rate
 }
 
 var (
@@ -57,7 +98,12 @@ func stateFor(path string) *usageState {
 }
 
 type usageLine struct {
-	Type    string `json:"type"`
+	Type            string `json:"type"`
+	Subtype         string `json:"subtype"`
+	Timestamp       string `json:"timestamp"`
+	CompactMetadata struct {
+		PreTokens int64 `json:"preTokens"`
+	} `json:"compactMetadata"`
 	Message struct {
 		ID    string `json:"id"`
 		Model string `json:"model"`
@@ -82,17 +128,39 @@ func Usage(cwd, sessionID string) (*Tokens, error) {
 	if path == "" {
 		return nil, nil
 	}
-	t, err := accumulate(path)
+	r, err := scan(path, time.Now())
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("tokens de %s: %w", path, err)
 	}
-	return t, nil
+	return r.tokens, nil
 }
 
-func accumulate(path string) (*Tokens, error) {
+// Activity devuelve contexto y ritmo de la sesión en la MISMA pasada incremental
+// que Usage (no relee el archivo). `now` es inyectable para testear la ventana.
+// Cada valor es nil si no hay datos (sin transcript, sin usage, sin actividad reciente).
+func Activity(cwd, sessionID string, now time.Time) (*Context, *Rate, error) {
+	root, err := projectsRoot()
+	if err != nil {
+		return nil, nil, err
+	}
+	path := findPath(root, cwd, sessionID)
+	if path == "" {
+		return nil, nil, nil
+	}
+	r, err := scan(path, now)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil, nil
+		}
+		return nil, nil, fmt.Errorf("actividad de %s: %w", path, err)
+	}
+	return r.context, r.rate, nil
+}
+
+func scan(path string, now time.Time) (*usageResult, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -110,6 +178,7 @@ func accumulate(path string) (*Tokens, error) {
 
 	if size < st.offset { // truncado o rotado
 		st.offset, st.totals, st.lastMessageID, st.counted = 0, Tokens{}, "", false
+		st.lastContext, st.compactions, st.lastCompactAt, st.lastPreTokens, st.recent = 0, 0, 0, 0, nil
 	}
 	if size > st.offset {
 		first := st.offset == 0
@@ -147,11 +216,68 @@ func accumulate(path string) (*Tokens, error) {
 			log.Printf("transcript: primera lectura completa de %s: %d bytes en %s", path, leidos, time.Since(start).Round(time.Millisecond))
 		}
 	}
+	return st.result(now), nil
+}
+
+// result arma la vista; st.mu tiene que estar tomado.
+func (st *usageState) result(now time.Time) *usageResult {
+	res := &usageResult{}
 	if !st.counted {
-		return nil, nil
+		return res
 	}
 	t := st.totals
-	return &t, nil
+	res.tokens = &t
+	c := &Context{Current: st.lastContext, Compactions: st.compactions}
+	if st.lastCompactAt > 0 {
+		at := st.lastCompactAt
+		c.LastCompactAt = &at
+	}
+	if st.compactions > 0 {
+		pre := st.lastPreTokens
+		c.LastPreTokens = &pre
+	}
+	res.context = c
+
+	from := now.Add(-rateWindowMin * time.Minute).UnixMilli()
+	to := now.UnixMilli()
+	r := &Rate{WindowMin: rateWindowMin}
+	for _, e := range st.recent {
+		if e.at > from && e.at <= to {
+			r.Output += e.out
+			r.Calls++
+		}
+	}
+	if r.Calls > 0 {
+		res.rate = r
+	}
+	return res
+}
+
+// pruneRecent descarta lo que quedó más de 10 min detrás de la entrada más nueva.
+func (st *usageState) pruneRecent() {
+	var newest int64
+	for _, e := range st.recent {
+		newest = max(newest, e.at)
+	}
+	cut := newest - rateKeep.Milliseconds()
+	i := 0
+	for i < len(st.recent) && st.recent[i].at < cut {
+		i++
+	}
+	if i > 0 {
+		st.recent = append([]rateEntry(nil), st.recent[i:]...)
+	}
+}
+
+func parseTS(s string) int64 {
+	if s == "" {
+		return 0
+	}
+	t, err := time.Parse(time.RFC3339Nano, s)
+	if err != nil {
+		return 0
+	}
+	return t.UnixMilli()
 }
 
 func (st *usageState) consume(data []byte) {
@@ -164,7 +290,18 @@ func (st *usageState) consume(data []byte) {
 			continue
 		}
 		var l usageLine
-		if json.Unmarshal(raw, &l) != nil || l.Type != "assistant" || l.Message.Usage == nil {
+		if json.Unmarshal(raw, &l) != nil {
+			continue
+		}
+		if l.Type == "system" && l.Subtype == "compact_boundary" {
+			st.compactions++
+			st.lastPreTokens = l.CompactMetadata.PreTokens
+			if at := parseTS(l.Timestamp); at > 0 {
+				st.lastCompactAt = at
+			}
+			continue
+		}
+		if l.Type != "assistant" || l.Message.Usage == nil {
 			continue
 		}
 		if m := l.Message.Model; m != "" {
@@ -181,5 +318,10 @@ func (st *usageState) consume(data []byte) {
 		st.totals.CacheCreation += u.CacheCreation
 		st.lastMessageID = id
 		st.counted = true
+		st.lastContext = u.Input + u.CacheRead + u.CacheCreation
+		if at := parseTS(l.Timestamp); at > 0 {
+			st.recent = append(st.recent, rateEntry{at: at, out: u.Output})
+			st.pruneRecent()
+		}
 	}
 }

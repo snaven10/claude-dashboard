@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func asstLine(id string, in, out, cr, cc int, model string) string {
@@ -195,5 +196,118 @@ func TestTimelineMissing(t *testing.T) {
 	ev, err := Timeline("/work/usage", "nada")
 	if err != nil || ev == nil || len(ev) != 0 {
 		t.Fatalf("%v %v", ev, err)
+	}
+}
+
+func asstAt(id, ts string, in, out, cr, cc int) string {
+	return fmt.Sprintf(`{"type":"assistant","timestamp":%q,"message":{"id":%q,"model":"m","usage":{"input_tokens":%d,"output_tokens":%d,"cache_read_input_tokens":%d,"cache_creation_input_tokens":%d}}}`+"\n",
+		ts, id, in, out, cr, cc)
+}
+
+func compactLine(ts string, pre int) string {
+	return fmt.Sprintf(`{"type":"system","subtype":"compact_boundary","timestamp":%q,"compactMetadata":{"trigger":"auto","preTokens":%d,"postTokens":1000}}`+"\n", ts, pre)
+}
+
+func TestActivityCompactions(t *testing.T) {
+	_, path := usageSetup(t)
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	// sin compactaciones: 0 y nil
+	appendFile(t, path, asstAt("a1", "2026-01-01T10:00:00.000Z", 1, 1, 1, 1))
+	c, _, err := Activity("/work/usage", "sess-u", now)
+	if err != nil || c == nil {
+		t.Fatalf("c=%v err=%v", c, err)
+	}
+	if c.Compactions != 0 || c.LastPreTokens != nil || c.LastCompactAt != nil {
+		t.Errorf("sin compactar: %+v", c)
+	}
+
+	// dos compactaciones: cuenta 2 y toma las del último
+	appendFile(t, path, compactLine("2026-01-01T10:30:00.000Z", 967001)+
+		asstAt("a2", "2026-01-01T10:31:00.000Z", 1, 1, 1, 1)+
+		compactLine("2026-01-01T11:00:00.000Z", 988000))
+	c, _, _ = Activity("/work/usage", "sess-u", now)
+	if c.Compactions != 2 || c.LastPreTokens == nil || *c.LastPreTokens != 988000 {
+		t.Fatalf("2 compactaciones: %+v", c)
+	}
+	want := time.Date(2026, 1, 1, 11, 0, 0, 0, time.UTC).UnixMilli()
+	if c.LastCompactAt == nil || *c.LastCompactAt != want {
+		t.Errorf("lastCompactAt=%v quiero %d", c.LastCompactAt, want)
+	}
+}
+
+func TestActivityContextIsLastMessageAndDedup(t *testing.T) {
+	_, path := usageSetup(t)
+	now := time.Date(2026, 1, 1, 10, 4, 0, 0, time.UTC)
+	appendFile(t, path,
+		asstAt("m1", "2026-01-01T10:00:00.000Z", 100, 5, 1000, 50)+
+			asstAt("m2", "2026-01-01T10:01:00.000Z", 10, 5, 400000, 2000)+
+			asstAt("m2", "2026-01-01T10:01:00.000Z", 10, 5, 400000, 2000)) // repetida
+	c, r, err := Activity("/work/usage", "sess-u", now)
+	if err != nil || c == nil || r == nil {
+		t.Fatalf("c=%v r=%v err=%v", c, r, err)
+	}
+	if c.Current != 402010 {
+		t.Errorf("current=%d, quiero 402010 (el del último mensaje, no la suma)", c.Current)
+	}
+	if r.Calls != 2 || r.Output != 10 {
+		t.Errorf("rate=%+v: la repetida no debe contarse", r)
+	}
+}
+
+func TestActivityRateWindow(t *testing.T) {
+	_, path := usageSetup(t)
+	base := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	ts := func(min float64) string {
+		return base.Add(time.Duration(min * float64(time.Minute))).Format("2006-01-02T15:04:05.000Z")
+	}
+	appendFile(t, path,
+		asstAt("old", ts(0), 1, 9000, 0, 0)+ // fuera de la ventana para now=+8
+			asstAt("a", ts(4), 1, 7000, 0, 0)+
+			asstAt("b", ts(6), 1, 3000, 0, 0)+
+			asstAt("c", ts(7), 1, 2000, 0, 0))
+	now := base.Add(8 * time.Minute) // ventana (+3, +8]
+	_, r, err := Activity("/work/usage", "sess-u", now)
+	if err != nil || r == nil {
+		t.Fatalf("r=%v err=%v", r, err)
+	}
+	if r.WindowMin != 5 || r.Calls != 3 || r.Output != 12000 {
+		t.Errorf("rate=%+v, quiero 3 llamadas y 12000", r)
+	}
+	// mucho después: sin actividad en la ventana → nil
+	if _, r, _ = Activity("/work/usage", "sess-u", base.Add(time.Hour)); r != nil {
+		t.Errorf("sin actividad reciente debe ser nil: %+v", r)
+	}
+	// mensajes de 12 min atrás se podan de la cola al llegar uno nuevo
+	appendFile(t, path, asstAt("d", ts(20), 1, 1, 0, 0))
+	if _, _, err := Activity("/work/usage", "sess-u", base.Add(21*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	st := stateFor(path)
+	st.mu.Lock()
+	n := len(st.recent)
+	st.mu.Unlock()
+	if n != 1 {
+		t.Errorf("cola=%d, quiero 1 tras podar >10 min", n)
+	}
+}
+
+func TestActivityIncremental(t *testing.T) {
+	_, path := usageSetup(t)
+	now := time.Date(2026, 1, 1, 10, 5, 0, 0, time.UTC)
+	first := asstAt("a", "2026-01-01T10:00:00.000Z", 1, 1, 1, 1) + compactLine("2026-01-01T10:01:00.000Z", 5)
+	appendFile(t, path, first)
+	if _, _, err := Activity("/work/usage", "sess-u", now); err != nil {
+		t.Fatal(err)
+	}
+	// Usage y Activity comparten pasada: ninguno relee sin cambios
+	if _, err := Usage("/work/usage", "sess-u"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Activity("/work/usage", "sess-u", now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if got := usageBytesRead.Load(); got != int64(len(first)) {
+		t.Errorf("leyó %d bytes, quiero %d (0 en los ciclos sin cambios)", got, len(first))
 	}
 }
