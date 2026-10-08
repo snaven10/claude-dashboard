@@ -1,7 +1,7 @@
 # PLAN-001 — Dashboard local de sesiones Claude Code
 
 **Fecha:** 2026-10-08
-**Fase:** 2 (Execution) — lote 3 cerrado
+**Fase:** 2 (Execution) — 5/5 tasks done; falta el verify y cierre del PLAN
 **Diseño:** [`PLAN-001-design.md`](./PLAN-001-design.md)
 **Proyectos:** claude-dashboard (`~/personal/claude-dashboard`)
 **Origen:** pedido del usuario — ver en un navegador qué hace cada sesión de Claude Code y en qué estado está
@@ -29,7 +29,7 @@ vistazo cuál está trabajando, cuál terminó y cuál está **trabada esperánd
 | **TASK-002** | Lector de cola del `.jsonl` + cache | claude-dashboard-worker | sonnet | TASK-001 (solo el `go.mod`) | `done` |
 | **TASK-003** | Server: `/api/sessions`, SSE, poller, embed | claude-dashboard-worker | sonnet | TASK-001, TASK-002 | `done` |
 | **TASK-004** | Frontend vanilla (tarjetas, filtros, orden) | claude-dashboard-worker | sonnet | contrato del design (no código) | `done` |
-| **TASK-005** | `make install` + unidad systemd `--user` + README + `project` por repo | claude-dashboard-worker | sonnet | TASK-003 | `pending` |
+| **TASK-005** | `make install` + unidad systemd `--user` + README + `project` por repo | claude-dashboard-worker | sonnet | TASK-003 | `done` |
 
 `claude-dashboard-worker` lo propuso `orq` (escalón 3, scout) y se guardó con scope proyecto
 (`.claude/agents/claude-dashboard-worker.md`, commit `95d9a10`).
