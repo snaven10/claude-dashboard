@@ -28,7 +28,7 @@ La UI muestra `context` y `rate`, suma tokens por plan, colapsa las terminadas v
 
 ## Criterios de aceptación
 - [x] `node --test`: formateo de contexto, suma por plan (con `tokens` null en alguna), corte de 24 h de "terminadas viejas", normalización de la búsqueda (tildes/mayúsculas).
-- [ ] (NO verificado visualmente: sin navegador en el worker) Con `?fixture`: todo visible en claro y oscuro, 1280 y 360 px, sin scroll horizontal; el texto hostil inerte.
+- [x] (verificado por el orquestador con Playwright; falta solo claro a 360 px) Con `?fixture`: todo visible en claro y oscuro, 1280 y 360 px, sin scroll horizontal; el texto hostil inerte.
 - [x] Ningún botón ni texto propone borrar sesiones.
 - [x] `node --check web/app.js` y `node --test web/` en verde, pegados en `Verificado por`.
 
