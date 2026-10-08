@@ -32,7 +32,7 @@ vistazo cuál está trabajando, cuál terminó y cuál está **trabada esperánd
 | **TASK-005** | `make install` + unidad systemd `--user` + README + `project` por repo | claude-dashboard-worker | sonnet | TASK-003 | `done` |
 
 `claude-dashboard-worker` lo propuso `orq` (escalón 3, scout) y se guardó con scope proyecto
-(`.claude/agents/claude-dashboard-worker.md`, commit `95d9a10`).
+(`.claude/agents/claude-dashboard-worker.md`, commit `868bf4d`).
 
 ### Paralelismo
 
@@ -53,7 +53,7 @@ vistazo cuál está trabajando, cuál terminó y cuál está **trabada esperánd
 
 ## 5. Cierre
 - **Cerrado:** 2026-10-08
-- **Shipeó:** rama `main` (sin remoto). Merges `2fc7342` TASK-001, `bab4775` TASK-004, `a68187c` TASK-002, `5cba136` TASK-003, `d2bba59` TASK-005. Instalado como servicio `systemd --user` (`claude-dashboard.service`, `enabled`), sirviendo `http://localhost:7777`.
+- **Shipeó:** rama `main` (sin remoto). Merges `c07f685` TASK-001, `1440bb8` TASK-004, `8e4b0be` TASK-002, `18dfe11` TASK-003, `44ce7bd` TASK-005. Instalado como servicio `systemd --user` (`claude-dashboard.service`, `enabled`), sirviendo `http://localhost:7777`.
 - **Verificación:**
   - Cada task con su `## Resultado` y QA del orquestador (vet, `go test -race`, pruebas de mutación donde había un orden o filtro que proteger).
   - Smoke end-to-end contra el servicio instalado (Playwright): 27 sesiones reales, orden de urgencia correcto, indicador `conectado`, título `(5) esperándote`, sin scroll horizontal, consola limpia. Poller 403-475 ms por ciclo con 25-27 sesiones (límite 1,5 s).
