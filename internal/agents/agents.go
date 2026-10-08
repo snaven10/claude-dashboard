@@ -56,6 +56,26 @@ type Session struct {
 	Stale          bool        `json:"stale"`
 	Orq            *Orq        `json:"orq"`
 	Tokens         *Tokens     `json:"tokens"`
+	Context        *Context    `json:"context"`
+	Rate           *Rate       `json:"rate"`
+}
+
+// Context es el contexto actual y las compactaciones (DD-13). Sin porcentaje: el
+// tamaño de ventana no está en ninguna fuente.
+type Context struct {
+	Current       int64  `json:"current"`
+	Compactions   int    `json:"compactions"`
+	LastCompactAt *int64 `json:"lastCompactAt"`
+	LastPreTokens *int64 `json:"lastPreTokens"`
+	Warn          bool   `json:"warn"`
+}
+
+// Rate es la actividad de tokens en la ventana de 5 min (DD-14).
+type Rate struct {
+	WindowMin int   `json:"windowMin"`
+	Output    int64 `json:"output"`
+	Calls     int   `json:"calls"`
+	High      bool  `json:"high"`
 }
 
 // Orq identifica a la sesión como worker de orq (DD-10). Plan y Task son nil

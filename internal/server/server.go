@@ -28,17 +28,22 @@ const (
 // Server junta poller, broadcaster y rutas. Las dependencias externas se
 // inyectan como función para testear sin ejecutar `claude`.
 type Server struct {
-	List       func(ctx context.Context) ([]agents.Session, error)
-	Summary    func(cwd, sessionID string) (transcript.Detail, error)
-	Usage      func(cwd, sessionID string) (*transcript.Tokens, error)
-	Timeline   func(cwd, sessionID string) ([]transcript.Event, error)
-	Orq        func() (map[string]orq.Job, error)
-	StaleAfter time.Duration // 0 desactiva stale
-	Now        func() time.Time
-	Static     fs.FS
-	Interval   time.Duration
-	Heartbeat  time.Duration
-	Logf       func(format string, args ...any)
+	List     func(ctx context.Context) ([]agents.Session, error)
+	Summary  func(cwd, sessionID string) (transcript.Detail, error)
+	Usage    func(cwd, sessionID string) (*transcript.Tokens, error)
+	Activity func(cwd, sessionID string, now time.Time) (*transcript.Context, *transcript.Rate, error)
+	Timeline func(cwd, sessionID string) ([]transcript.Event, error)
+	// Umbrales de PLAN-003; 0 desactiva el aviso correspondiente.
+	ContextWarn int64 // context.warn si current >= ContextWarn
+	RateOutput  int64 // rate.high si output > RateOutput
+	RateCalls   int   // rate.high si calls > RateCalls
+	Orq         func() (map[string]orq.Job, error)
+	StaleAfter  time.Duration // 0 desactiva stale
+	Now         func() time.Time
+	Static      fs.FS
+	Interval    time.Duration
+	Heartbeat   time.Duration
+	Logf        func(format string, args ...any)
 
 	mu       sync.Mutex
 	hash     [32]byte

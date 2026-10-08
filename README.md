@@ -14,6 +14,13 @@ espera, título, último prompt y última acción. Además (PLAN-002):
 | `orq` | `{job, plan, task, specialist, ws}` si la sesión es un worker de orq (une `name` de F1 con `bgname` de `~/.orq/jobs.json`); `null` si no. `plan`/`task` salen del key (`p<N>-task<M>`) y son `null` si no matchea. Si `jobs.json` falta o está roto, todas quedan en `null`. |
 | `tokens` | `{input, output, cacheRead, cacheCreation, model}` acumulados del transcript (deduplicados por `message.id`); `null` si no hay transcript. Sin costo en dólares. |
 
+PLAN-003 suma, calculados en la misma pasada incremental del transcript que `tokens`:
+
+| Campo | Qué es |
+|-------|--------|
+| `context` | `{current, compactions, lastCompactAt, lastPreTokens, warn}`. `current` = input + cache_read + cache_creation del ÚLTIMO mensaje del asistente (no la suma). `compactions` cuenta las líneas `compact_boundary`; `lastCompactAt`/`lastPreTokens` son `null` si nunca compactó. `warn` si `current >= -context-warn` (default `800000`, `0` lo desactiva). Es absoluto: el tamaño de ventana no está en ninguna fuente, por eso no hay porcentaje. `null` sin mensajes con usage. |
+| `rate` | `{windowMin: 5, output, calls, high}` con los tokens de salida y las llamadas (`message.id` únicos) de los últimos 5 min según los timestamps del transcript. `high` si `output > -rate-output` (default `20000`) o `calls > -rate-calls` (default `25`); `0` desactiva cada uno. `null` sin actividad en la ventana. Es "ritmo inusual", no "loop". |
+
 `GET /api/sessions/{sessionId}/timeline` devuelve `{sessionId, events}` con los últimos 20 eventos
 (`prompt` | `tool` | `text`, del más viejo al más nuevo), leídos de la cola del transcript. Solo acepta
 ids presentes en el último snapshot (404 si no).

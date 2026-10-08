@@ -513,3 +513,61 @@ func TestSessionsCarryTokens(t *testing.T) {
 		t.Errorf("con tokens %d, sin tokens %d; esperaba 1 y 1", con, sin)
 	}
 }
+
+// El poller tiene que pedir contexto y ritmo y aplicar los umbrales; si deja de
+// llamar a Activity, este test falla (mismo bug que tuvo Usage en PLAN-002).
+func TestSessionsCarryContextAndRate(t *testing.T) {
+	s := newTestServer(func(context.Context) ([]agents.Session, error) { return fakeSessions(3), nil })
+	s.ContextWarn, s.RateOutput, s.RateCalls = 800_000, 20_000, 25
+	pre := int64(967001)
+	s.Activity = func(cwd, id string, now time.Time) (*transcript.Context, *transcript.Rate, error) {
+		switch {
+		case strings.HasSuffix(id, "0"): // alto en contexto y en output
+			return &transcript.Context{Current: 850_000, Compactions: 2, LastPreTokens: &pre},
+				&transcript.Rate{WindowMin: 5, Output: 20_001, Calls: 3}, nil
+		case strings.HasSuffix(id, "1"): // bajo; high solo por llamadas = 25 no supera
+			return &transcript.Context{Current: 799_999}, &transcript.Rate{WindowMin: 5, Output: 20_000, Calls: 25}, nil
+		}
+		return nil, nil, errors.New("roto") // un fallo no tumba la sesión
+	}
+	if _, err := s.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	s.mu.Lock()
+	got := append([]agents.Session(nil), s.sessions...)
+	s.mu.Unlock()
+	if len(got) != 3 {
+		t.Fatalf("sesiones=%d", len(got))
+	}
+	if c := got[0].Context; c == nil || !c.Warn || c.Compactions != 2 || c.LastPreTokens == nil || *c.LastPreTokens != pre {
+		t.Errorf("sesión 0 context=%+v", c)
+	}
+	if r := got[0].Rate; r == nil || !r.High {
+		t.Errorf("sesión 0 rate=%+v, quiero high por output", r)
+	}
+	if c := got[1].Context; c == nil || c.Warn || c.LastPreTokens != nil {
+		t.Errorf("sesión 1 context=%+v", c)
+	}
+	if r := got[1].Rate; r == nil || r.High {
+		t.Errorf("sesión 1 rate=%+v, quiero no-high en el borde", r)
+	}
+	if got[2].Context != nil || got[2].Rate != nil || got[2].Title == "" {
+		t.Errorf("sesión 2 debe degradar sin perder el resumen: %+v", got[2])
+	}
+	// por llamadas
+	s2 := newTestServer(func(context.Context) ([]agents.Session, error) { return fakeSessions(1), nil })
+	s2.RateCalls = 25
+	s2.Activity = func(string, string, time.Time) (*transcript.Context, *transcript.Rate, error) {
+		return nil, &transcript.Rate{WindowMin: 5, Calls: 26}, nil
+	}
+	if _, err := s2.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if r := s2.sessions[0].Rate; r == nil || !r.High {
+		t.Errorf("rate por llamadas=%+v", r)
+	}
+	// ciclo siguiente con el mismo resultado: no emite
+	if changed, _ := s.Refresh(context.Background()); changed {
+		t.Error("ciclo sin cambios emitió")
+	}
+}
