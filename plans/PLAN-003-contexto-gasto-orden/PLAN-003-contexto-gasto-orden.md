@@ -1,7 +1,7 @@
 # PLAN-003 — Contexto, gasto por plan, orden y ritmo
 
 **Fecha:** 2026-10-08
-**Fase:** 2 (Execution) — aprobado por el usuario ("dale con todas… avanzá con todo")
+**Fase:** Cerrado
 **Diseño:** [`PLAN-003-design.md`](./PLAN-003-design.md)
 **Proyectos:** claude-dashboard (`~/personal/claude-dashboard`)
 **Origen:** mejoras 1-5 propuestas tras cerrar PLAN-002
@@ -30,8 +30,8 @@
 ## 3. Tasks y orden
 | Task | Qué | Especialista | Modelo | Depende de | Estado |
 |------|-----|--------------|--------|------------|--------|
-| **TASK-008** | Backend: `context` y `rate` por sesión desde el transcript | claude-dashboard-worker | sonnet | contrato del design | `pending` |
-| **TASK-009** | Frontend: contexto, total por plan, terminadas viejas, búsqueda, ritmo | claude-dashboard-worker | sonnet | contrato del design (no código) | `pending` |
+| **TASK-008** | Backend: `context` y `rate` por sesión desde el transcript | claude-dashboard-worker | sonnet | contrato del design | `done` |
+| **TASK-009** | Frontend: contexto, total por plan, terminadas viejas, búsqueda, ritmo | claude-dashboard-worker | sonnet | contrato del design (no código) | `done` |
 
 ### Paralelismo
 
@@ -45,4 +45,13 @@
 - Historial persistente entre reinicios (el ritmo se recalcula del transcript, no hace falta).
 
 ## 5. Cierre
-<!-- SE LLENA AL CERRAR EL PLAN -->
+- **Cerrado:** 2026-10-08
+- **Shipeó:** rama `main` (sin remoto). Merges `a8e94a4` TASK-008 y `d51f7dd` TASK-009. Servicio reinstalado con `make install`.
+- **Verificación:**
+  - `go test -race` (4 paquetes) y 15 tests de node en `main`; el código de `main` es idéntico al de la rama de integración que pasó QA.
+  - Contra 30 sesiones reales: `context` cuadra en 26/26 con un conteo independiente; `rate` exacto en las sesiones quietas; 1 sesión real con `warn`.
+  - Navegador: búsqueda, totales por plan, contexto y ritmo con datos reales; terminadas viejas, aviso de contexto y ritmo inusual con el fixture en oscuro a 360 px. Nada en la UI propone borrar sesiones (DD-15).
+  - **Primer lote sin bugs en la QA**: el worker ya corre sus tests y los criterios pedían tests a nivel server (lección de PLAN-002).
+- **NO verificado:** la sección de terminadas viejas con datos reales (hoy no hay `done` de más de 24 h); "ritmo inusual" con una sesión real por encima del p99; modo claro a 360 px de lo nuevo.
+- **Quedó afuera:** lo de §4. Sin tasks `skipped`.
+- **Continúa en:** —
