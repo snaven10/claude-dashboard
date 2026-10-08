@@ -1,7 +1,7 @@
 # PLAN-001 — Dashboard local de sesiones Claude Code
 
 **Fecha:** 2026-10-08
-**Fase:** 1 (Planning) — pendiente de aprobación
+**Fase:** 2 (Execution) — lote 1 cerrado
 **Diseño:** [`PLAN-001-design.md`](./PLAN-001-design.md)
 **Proyectos:** claude-dashboard (`~/personal/claude-dashboard`)
 **Origen:** pedido del usuario — ver en un navegador qué hace cada sesión de Claude Code y en qué estado está
@@ -25,14 +25,14 @@ vistazo cuál está trabajando, cuál terminó y cuál está **trabada esperánd
 ## 3. Tasks y orden
 | Task | Qué | Especialista | Modelo | Depende de | Estado |
 |------|-----|--------------|--------|------------|--------|
-| **TASK-001** | Scaffold Go + colector F1/F2 → `[]Session` | claude-dashboard-worker | sonnet | — | `pending` |
+| **TASK-001** | Scaffold Go + colector F1/F2 → `[]Session` | claude-dashboard-worker | sonnet | — | `done` |
 | **TASK-002** | Lector de cola del `.jsonl` + cache | claude-dashboard-worker | sonnet | TASK-001 (solo el `go.mod`) | `pending` |
 | **TASK-003** | Server: `/api/sessions`, SSE, poller, embed | claude-dashboard-worker | sonnet | TASK-001, TASK-002 | `pending` |
-| **TASK-004** | Frontend vanilla (tarjetas, filtros, orden) | claude-dashboard-worker | sonnet | contrato del design (no código) | `pending` |
+| **TASK-004** | Frontend vanilla (tarjetas, filtros, orden) | claude-dashboard-worker | sonnet | contrato del design (no código) | `done` |
 | **TASK-005** | `make install` + unidad systemd `--user` + README | claude-dashboard-worker | haiku | TASK-003 | `pending` |
 
-`claude-dashboard-worker` **todavía no existe**: lo propone `orq` (escalón 3, scout) y el usuario
-elige el scope al guardarlo.
+`claude-dashboard-worker` lo propuso `orq` (escalón 3, scout) y se guardó con scope proyecto
+(`.claude/agents/claude-dashboard-worker.md`, commit `95d9a10`).
 
 ### Paralelismo
 

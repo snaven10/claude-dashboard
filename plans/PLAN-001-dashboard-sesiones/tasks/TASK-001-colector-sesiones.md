@@ -4,7 +4,7 @@
 - **Especialista:** claude-dashboard-worker
 - **Proyecto:** claude-dashboard (`~/personal/claude-dashboard`), rama `main`
 - **Depende de:** — (primera del plan)
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -34,8 +34,8 @@
 
 ## Resultado
 <!-- SE LLENA AL CERRAR (estado done/skipped). Vacío mientras esté pending. -->
-- **Estado final:**
-- **Resumen:**
-- **Archivos tocados:**
-- **Verificado por:**
+- **Estado final:** done
+- **Resumen:** `agents.List(ctx)` y `agents.Collector{Run, SessionsDir}.List(ctx)` devuelven `[]Session` con el contrato del design. F1 vía `exec.CommandContext` (timeout 10 s, error claro si `claude` no está en PATH), F2 solo por PID devuelto por F1 (falta/basura → se ignora), DD-6 aplicado (background `blocked`→blocked, estados terminales→done, `working`→busy), `project`=basename(cwd), `id` derivado de `sessionId[:8]` si F1 no lo trae. Rama `feature/plan-1-task-001`, commit `a455db4` (sin push). Hallazgo F1 real: las background `blocked` vienen SIN `pid` ni `status`; las interactive no traen `id`. El valor exacto de `state` para background terminada no pudo observarse (no había ninguna), se asumió un set de estados terminales (`done/completed/finished/failed/stopped/...`) y background sin state ni status → done: Validado contra la forma real observada después (`state:"done"`, `status:"idle"`, con `pid`): caso `g` en el fixture, commit `2d7a8e0`.
+- **Archivos tocados:** `go.mod`, `.gitignore`, `cmd/claude-dashboard/main.go` (stub), `internal/agents/agents.go`, `internal/agents/agents_test.go`, `internal/agents/testdata/f1.json`, `internal/agents/testdata/sessions/{101,102}.json`
+- **Verificado por:** QA del orquestador (2026-10-08, a pedido del usuario): `gofmt -l .` limpio, `go vet` OK, `go test` 5/5 PASS, `go.mod` sin `require`. Prueba de mutación: mover `case r.Status != ""` antes de `finishedStates` hace fallar `TestListNormalizacion` (sesión g) — el test protege el orden.
 
