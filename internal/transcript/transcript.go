@@ -26,6 +26,7 @@ const (
 	maxWindow     = 2 << 20   // 2 MB
 	maxPrompt     = 500
 	maxAction     = 200
+	maxAsk        = 300
 )
 
 // Action es la última acción de la sesión. Misma forma que agents.LastAction
@@ -35,12 +36,21 @@ type Action struct {
 	Text string `json:"text"`
 }
 
+// Ask es lo último que la sesión dejó abierto (DD-21). Kind: "question" |
+// "tool" | "text". More = preguntas restantes de un AskUserQuestion.
+type Ask struct {
+	Kind string `json:"kind"`
+	Text string `json:"text"`
+	More int    `json:"more"`
+}
+
 // Detail es el resumen de una sesión sacado de su transcript.
 type Detail struct {
 	Title          string  `json:"title"`
 	LastPrompt     string  `json:"lastPrompt"`
 	LastAction     *Action `json:"lastAction"`
 	LastActivityAt int64   `json:"lastActivityAt"` // ms epoch; 0 si no hay
+	Ask            *Ask    `json:"ask"`            // nil si Claude está trabajando
 }
 
 // Root es el directorio de proyectos. Vacío = ~/.claude/projects.
@@ -205,10 +215,101 @@ type line struct {
 }
 
 type block struct {
-	Type  string                     `json:"type"`
-	Text  string                     `json:"text"`
-	Name  string                     `json:"name"`
-	Input map[string]json.RawMessage `json:"input"`
+	Type      string                     `json:"type"`
+	Text      string                     `json:"text"`
+	Name      string                     `json:"name"`
+	ID        string                     `json:"id"`
+	ToolUseID string                     `json:"tool_use_id"`
+	Input     map[string]json.RawMessage `json:"input"`
+}
+
+// askScan sigue, de atrás hacia adelante, qué quedó abierto (DD-21).
+// Yendo hacia atrás el tool_result aparece ANTES que su tool_use, por eso
+// basta con juntar los ids contestados a medida que se avanza.
+type askScan struct {
+	answered map[string]bool
+	question *Ask
+	tool     *Ask
+	text     *Ask
+	sawUser  bool // ya pasó un mensaje del usuario (resultado o prompt) más nuevo
+	done     bool // llegó a un prompt real: lo anterior no cuenta
+}
+
+func (a *askScan) result() *Ask {
+	switch {
+	case a.question != nil:
+		return a.question
+	case a.tool != nil:
+		return a.tool
+	}
+	return a.text
+}
+
+// user registra los tool_result de una línea user (cierran sus tool_use).
+func (a *askScan) user(content json.RawMessage) {
+	var blocks []block
+	if json.Unmarshal(content, &blocks) == nil {
+		for _, b := range blocks {
+			if b.Type == "tool_result" {
+				if a.answered == nil {
+					a.answered = map[string]bool{}
+				}
+				a.answered[b.ToolUseID] = true
+				a.sawUser = true
+			}
+		}
+	}
+}
+
+// assistant mira los bloques de un mensaje del asistente.
+func (a *askScan) assistant(content json.RawMessage) {
+	var blocks []block
+	if json.Unmarshal(content, &blocks) != nil {
+		return
+	}
+	for i := len(blocks) - 1; i >= 0; i-- {
+		b := blocks[i]
+		switch b.Type {
+		case "tool_use":
+			if b.ID == "" || b.Name == "" || a.answered[b.ID] {
+				continue
+			}
+			if b.Name == "AskUserQuestion" {
+				if a.question == nil {
+					if q := questionAsk(b.Input); q != nil {
+						a.question = q
+					}
+				}
+			} else if a.tool == nil {
+				t := b.Name
+				if sum := summarizeInput(b.Input); sum != "" {
+					t += ": " + sum
+				}
+				a.tool = &Ask{Kind: "tool", Text: truncate(oneLine(t), maxAsk)}
+			}
+		case "text":
+			if a.text == nil && !a.sawUser {
+				if t := oneLine(b.Text); t != "" {
+					a.text = &Ask{Kind: "text", Text: truncate(t, maxAsk)}
+				}
+			}
+		}
+	}
+}
+
+// questionAsk arma la pregunta de un input de AskUserQuestion.
+func questionAsk(in map[string]json.RawMessage) *Ask {
+	var qs []struct {
+		Question string `json:"question"`
+	}
+	if json.Unmarshal(in["questions"], &qs) != nil || len(qs) == 0 {
+		return nil
+	}
+	text := oneLine(qs[0].Question)
+	if text == "" {
+		return nil
+	}
+	return &Ask{Kind: "question", Text: truncate(text, maxAsk), More: len(qs) - 1}
 }
 
 // parse recorre las líneas (tolerante) y extrae el detalle.
@@ -217,6 +318,7 @@ func parse(data []byte) (Detail, bool) {
 	var fallbackPrompt string
 	var action *Action
 	var realUser bool
+	var ask askScan
 
 	lines := bytes.Split(data, []byte{'\n'})
 	for i := len(lines) - 1; i >= 0; i-- { // de atrás hacia adelante: lo último gana
@@ -241,18 +343,29 @@ func parse(data []byte) (Detail, bool) {
 				fallbackPrompt = strings.TrimSpace(l.LastPrompt)
 			}
 		case "user":
-			if !realUser && !l.IsMeta {
+			if l.IsMeta {
+				continue
+			}
+			if !ask.done {
+				ask.user(l.Message.Content)
+			}
+			if !realUser {
 				if text, ok := realUserText(l.Message.Content); ok {
 					d.LastPrompt = truncate(text, maxPrompt)
 					realUser = true
+					ask.done, ask.sawUser = true, true
 				}
 			}
 		case "assistant":
 			if action == nil {
 				action = assistantAction(l.Message.Content)
 			}
+			if !ask.done {
+				ask.assistant(l.Message.Content)
+			}
 		}
 	}
+	d.Ask = ask.result()
 	if !realUser && fallbackPrompt != "" {
 		d.LastPrompt = truncate(fallbackPrompt, maxPrompt)
 	}

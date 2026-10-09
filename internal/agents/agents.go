@@ -60,6 +60,23 @@ type Session struct {
 	Tokens         *Tokens     `json:"tokens"`
 	Context        *Context    `json:"context"`
 	Rate           *Rate       `json:"rate"`
+	Ask            *Ask        `json:"ask"`
+	Errors         *Errors     `json:"errors"`
+}
+
+// Ask es lo último que la sesión dejó abierto (DD-21): "question", "tool" o "text".
+type Ask struct {
+	Kind string `json:"kind"`
+	Text string `json:"text"`
+	More int    `json:"more"`
+}
+
+// Errors son los errores de herramientas de la ventana de 10 min (DD-22).
+type Errors struct {
+	WindowMin int   `json:"windowMin"`
+	Count     int   `json:"count"`
+	LastAt    int64 `json:"lastAt"`
+	High      bool  `json:"high"`
 }
 
 // Context es el contexto actual y las compactaciones (DD-13). Sin porcentaje: el

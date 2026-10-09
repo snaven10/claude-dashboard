@@ -311,3 +311,70 @@ func TestActivityIncremental(t *testing.T) {
 		t.Errorf("leyó %d bytes, quiero %d (0 en los ciclos sin cambios)", got, len(first))
 	}
 }
+
+// --- errors (DD-22) ---
+
+func errLine(ts, id string, content string) string {
+	return fmt.Sprintf(`{"type":"user","timestamp":%q,"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":%q,"is_error":true,"content":%s}]}}`+"\n", ts, id, content)
+}
+
+func TestErrorsWindowAndExclusions(t *testing.T) {
+	_, path := usageSetup(t)
+	base := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	ts := func(min int) string {
+		return base.Add(time.Duration(min) * time.Minute).Format("2006-01-02T15:04:05.000Z")
+	}
+	appendFile(t, path,
+		errLine(ts(0), "e0", `"fallo viejo"`)+ // fuera de la ventana para now=+11
+			errLine(ts(2), "e1", `"Exit code 1"`)+ // string
+			errLine(ts(3), "e2", `[{"type":"text","text":"boom"}]`)+ // lista de bloques
+			errLine(ts(4), "e3", `"The user doesn't want to proceed with this tool use."`)+
+			errLine(ts(5), "e4", `[{"type":"text","text":"[Request interrupted by user for tool use]"}]`)+
+			`{"type":"user","timestamp":"`+ts(6)+`","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"ok","content":"bien"}]}}`+"\n"+
+			errLine("basura", "e5", `"sin timestamp válido"`))
+	e, err := Errors("/work/usage", "sess-u", base.Add(11*time.Minute)) // ventana (+1, +11]
+	if err != nil || e == nil {
+		t.Fatalf("e=%v err=%v", e, err)
+	}
+	if e.WindowMin != 10 || e.Count != 2 || e.LastAt != base.Add(3*time.Minute).UnixMilli() {
+		t.Errorf("errors=%+v, quiero 2 con lastAt=+3", e)
+	}
+	// ya sin nada en la ventana → nil
+	if e, _ = Errors("/work/usage", "sess-u", base.Add(time.Hour)); e != nil {
+		t.Errorf("fuera de ventana debe ser nil: %+v", e)
+	}
+	// sin mensajes con usage igual cuenta (independiente de tokens/context)
+	if c, r, _ := Activity("/work/usage", "sess-u", base.Add(11*time.Minute)); c != nil || r != nil {
+		t.Errorf("sin usage: context/rate deben ser nil (%v, %v)", c, r)
+	}
+}
+
+func TestErrorsIncremental(t *testing.T) {
+	_, path := usageSetup(t)
+	now := time.Date(2026, 1, 1, 10, 5, 0, 0, time.UTC)
+	first := errLine("2026-01-01T10:01:00.000Z", "e1", `"x"`) + errLine("2026-01-01T10:02:00.000Z", "e2", `"y"`)
+	appendFile(t, path, first)
+	e, err := Errors("/work/usage", "sess-u", now)
+	if err != nil || e == nil || e.Count != 2 {
+		t.Fatalf("e=%+v err=%v", e, err)
+	}
+	// 2º ciclo sin cambios (y otro consumidor de la misma pasada): 0 bytes nuevos
+	if _, err := Errors("/work/usage", "sess-u", now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Activity("/work/usage", "sess-u", now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if got := usageBytesRead.Load(); got != int64(len(first)) {
+		t.Errorf("leyó %d bytes, quiero %d (0 en los ciclos sin cambios)", got, len(first))
+	}
+	// una línea nueva se lee sola, sin releer lo anterior
+	more := errLine("2026-01-01T10:04:00.000Z", "e3", `"z"`)
+	appendFile(t, path, more)
+	if e, _ = Errors("/work/usage", "sess-u", now); e == nil || e.Count != 3 {
+		t.Fatalf("e=%+v, quiero 3", e)
+	}
+	if got := usageBytesRead.Load(); got != int64(len(first)+len(more)) {
+		t.Errorf("leyó %d bytes, quiero %d", got, len(first)+len(more))
+	}
+}
