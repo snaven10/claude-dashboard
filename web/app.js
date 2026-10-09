@@ -214,6 +214,8 @@
     var fields = [s.name, s.title, s.lastPrompt, s.project, o.plan, o.task, s.branch, s.plan && s.plan.name];
     // "plan 3" / "PLAN-3" también deberían encontrar: sumamos las etiquetas
     fields.push(orqLabel(s.orq));
+    // PLAN-008: "PR #87", "87" (vía "#87") y el repo del PR
+    validPrs(s).forEach(function (p) { fields.push('PR #' + p.number, 'PR ' + p.number, p.repo); });
     return fields.some(function (f) { return normalizeText(f).indexOf(n) !== -1; });
   }
 
@@ -365,9 +367,84 @@
     return { output: formatTokens(last.output), sessions: typeof last.sessions === 'number' ? last.sessions : 0 };
   }
 
+  // ---- PLAN-008: datos de sesión (DD-36) ----
+
+  var TURN_WARN_MIN = 15;
+  var PR_URL_RE = /^https:\/\/[^\s"'<>\\]+$/;
+  var ARTIFACT_URL_RE = /^https:\/\/claude\.ai\/[^\s"'<>\\]*$/;
+
+  // El server ya valida, pero la URL va a un href: se revalida en el cliente.
+  function validPrUrl(u) { return typeof u === 'string' && PR_URL_RE.test(u); }
+  function validArtifactUrl(u) { return typeof u === 'string' && ARTIFACT_URL_RE.test(u); }
+
+  // PRs con número entero > 0 y URL https válida; el resto se descarta.
+  function validPrs(s) {
+    var list = s && Array.isArray(s.prs) ? s.prs : [];
+    return list.filter(function (p) {
+      return p && typeof p.number === 'number' && isFinite(p.number) && p.number > 0 &&
+        Math.floor(p.number) === p.number && validPrUrl(p.url);
+    });
+  }
+
+  function validArtifacts(s) {
+    var list = s && Array.isArray(s.artifacts) ? s.artifacts : [];
+    return list.filter(function (a) { return a && validArtifactUrl(a.url); });
+  }
+
+  // Minutos del turno en curso; null si no está busy o no hay dato.
+  function turnMinutes(s, now) {
+    if (!s || s.status !== 'busy' || typeof s.turnStartedAt !== 'number' || !isFinite(s.turnStartedAt)) return null;
+    return Math.max(0, Math.floor((now - s.turnStartedAt) / 60000));
+  }
+
+  // Línea secundaria de la fila: away.text si hay y la sesión no está busy. '' = no aplica.
+  function awayLine(s) {
+    if (!s || s.status === 'busy' || !s.away || typeof s.away.text !== 'string') return '';
+    return plainText(s.away.text);
+  }
+
+  function activeSubagents(s) {
+    var n = s && s.subagents && s.subagents.active;
+    return typeof n === 'number' && n > 0 ? Math.floor(n) : 0;
+  }
+
+  function hasLines(s) {
+    var l = s && s.lines;
+    return !!l && typeof l.added === 'number' && typeof l.removed === 'number' && (l.added > 0 || l.removed > 0);
+  }
+
+  function permissionChip(s) {
+    var m = s && s.permissionMode;
+    return typeof m === 'string' && /^[A-Za-z]{1,32}$/.test(m) && m !== 'default' ? m : '';
+  }
+
+  // Chips de datos nuevos, en el orden de la maqueta: subagentes, PR, líneas, turno, permisos.
+  // Cada uno: { cls, text, title, lines? }.
+  function sessionChips(s, now) {
+    var out = [];
+    var sub = activeSubagents(s);
+    if (sub > 0) {
+      out.push({ cls: 'sub', text: sub + (sub === 1 ? ' subagente' : ' subagentes'),
+        title: 'Subagentes activos ahora (' + (s.subagents.total || 0) + ' en total)' });
+    }
+    var prs = validPrs(s);
+    if (prs.length) out.push({ cls: 'pr', text: 'PR #' + prs[prs.length - 1].number, title: prs[prs.length - 1].repo || '' });
+    if (hasLines(s)) {
+      out.push({ cls: 'lines num', text: '+' + s.lines.added + ' −' + s.lines.removed, lines: s.lines,
+        title: 'Líneas agregadas y quitadas en la sesión' });
+    }
+    var tm = turnMinutes(s, now);
+    if (tm !== null && tm >= TURN_WARN_MIN) out.push({ cls: 'warn', text: 'turno de ' + tm + ' min', title: 'Hace ' + tm + ' min que Claude trabaja en este turno' });
+    var perm = permissionChip(s);
+    if (perm) out.push({ cls: '', text: perm, title: 'Modo de permisos' });
+    return out;
+  }
+
   if (typeof document === 'undefined') {
     if (typeof module !== 'undefined' && module.exports) {
       module.exports = {
+        validPrUrl: validPrUrl, validArtifactUrl: validArtifactUrl, validPrs: validPrs, validArtifacts: validArtifacts,
+        turnMinutes: turnMinutes, awayLine: awayLine, sessionChips: sessionChips,
         isAbandoned: isAbandoned, counts: counts, inboxItems: inboxItems, splitAbandoned: splitAbandoned,
         stepSelection: stepSelection, plainText: plainText, oneLine: oneLine, todayView: todayView,
         notifyTargets: notifyTargets, formatTokens: formatTokens, totalTokens: totalTokens,
@@ -805,6 +882,19 @@
       w.appendChild(chip('warn', '⚠ contexto ' + formatTokens(s.context.current), contextTitle(s.context)));
     }
     if (s.stale) w.appendChild(chip('warn', '⚠ sin actividad ' + ago(s.lastActivityAt)));
+    sessionChips(s, nowMs()).forEach(function (c) {
+      var n;
+      if (c.lines) {
+        n = el('span', 'chip ' + c.cls);
+        n.appendChild(el('span', 'add', '+' + c.lines.added));
+        n.appendChild(document.createTextNode(' '));
+        n.appendChild(el('span', 'del', '−' + c.lines.removed));
+        n.title = c.title;
+      } else {
+        n = chip(c.cls, c.text, c.title);
+      }
+      w.appendChild(n);
+    });
     return w.childNodes.length ? w : null;
   }
 
@@ -823,8 +913,11 @@
     var main = el('span', 'row-main');
     main.appendChild(el('span', 'row-title', titleOf(s)));
     var av = st === 'idle' ? askView(s) : null;
-    var sub = av ? plainText(av.text) : [s.project, s.branch ? '⎇ ' + s.branch : null].filter(Boolean).join(' · ');
-    main.appendChild(el('span', 'row-sub', sub));
+    var away = awayLine(s);
+    var sub = away || (av ? plainText(av.text) : [s.project, s.branch ? '⎇ ' + s.branch : null].filter(Boolean).join(' · '));
+    var subEl = el('span', 'row-sub', sub);
+    if (away) subEl.title = 'Mientras no estabas';
+    main.appendChild(subEl);
     var chips = chipsFor(s, false);
     if (chips) main.appendChild(chips);
     r.appendChild(main);
@@ -1079,6 +1172,23 @@
     return box;
   }
 
+  function stat(label, value, warn) {
+    var b = el('div', 'stat' + (warn ? ' warn' : ''));
+    b.appendChild(el('span', 'stat-k', label));
+    b.appendChild(el('span', 'stat-v num', value));
+    return b;
+  }
+
+  // Las URLs ya pasaron por validPrUrl/validArtifactUrl: nunca llega un javascript:.
+  function extLink(text, url) {
+    var a = el('a', null, text);
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.title = url;
+    return a;
+  }
+
   function buildDetail(d, s) {
     var st = statusOf(s);
     var key = sessionKey(s);
@@ -1097,6 +1207,8 @@
     meta.appendChild(el('span', null, s.project || '—'));
     if (s.name && s.name !== s.title) meta.appendChild(el('span', null, s.name));
     meta.appendChild(el('span', null, ago(s.lastActivityAt || s.startedAt)));
+    var perm = permissionChip(s);
+    if (perm) meta.appendChild(el('span', null, 'permisos: ' + perm));
     if (s.remote) {
       var rm = el('span', null, '📡 remoto');
       rm.title = 'Sesión con bridge remoto';
@@ -1108,6 +1220,14 @@
       var br = el('div', 'branch', '⎇ ' + s.branch);
       br.title = s.branch;
       nodes.push(br);
+    }
+
+    var aw = awayLine(s);
+    if (aw) {
+      var awBox = el('div', 'away');
+      awBox.appendChild(el('span', 'lbl', 'Mientras no estabas'));
+      awBox.appendChild(document.createTextNode(aw));
+      nodes.push(awBox);
     }
 
     var chips = chipsFor(s, true);
@@ -1165,6 +1285,22 @@
       nodes.push(cx);
     }
 
+    var stats = el('div', 'stats');
+    var tmin = turnMinutes(s, nowMs());
+    if (tmin !== null) stats.appendChild(stat('turno actual', tmin + ' min', tmin >= TURN_WARN_MIN));
+    if (hasLines(s)) stats.appendChild(stat('líneas', '+' + s.lines.added + ' −' + s.lines.removed, false));
+    if (stats.childNodes.length) nodes.push(stats);
+
+    var prs = validPrs(s);
+    var arts = validArtifacts(s);
+    if (prs.length || arts.length) {
+      var links = el('div', 'links');
+      links.appendChild(el('span', 'section-lbl', 'Links'));
+      prs.forEach(function (p) { links.appendChild(extLink('PR #' + p.number + (p.repo ? ' · ' + p.repo : ''), p.url)); });
+      arts.forEach(function (a) { links.appendChild(extLink('Artifact: ' + (a.title || a.url), a.url)); });
+      nodes.push(links);
+    }
+
     var tl = el('div', 'tl-wrap');
     tl.appendChild(el('span', 'section-lbl', 'Línea de tiempo'));
     tl.appendChild(timelineNode());
@@ -1200,7 +1336,7 @@
     var s = selectedSession();
     if (s && (!isPhone() || phoneDetail)) ensureTimeline(s);
     var minute = s ? Math.floor((nowMs() - (s.lastActivityAt || s.startedAt || 0)) / 60000) : 0;
-    var sig = JSON.stringify([s, minute, qrOpenFor === (s && sessionKey(s)), s ? expanded.has(s.id) : false,
+    var sig = JSON.stringify([s, minute, s ? turnMinutes(s, nowMs()) : null, qrOpenFor === (s && sessionKey(s)), s ? expanded.has(s.id) : false,
       timeline.key, timeline.version, timeline.status]);
     if (sig === detailSig) return;
     detailSig = sig;
