@@ -346,3 +346,19 @@ h2 { margin: 0 0 6px; font-size: 0.75rem; text-transform: uppercase; letter-spac
 .ask-q .lbl { display: inline; }
 .ask-card header strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ask-actions button { min-height: 26px; padding: 1px 8px; }
+
+/* PLAN-008: datos de sesión */
+.chip.sub { background: var(--busy-bg); color: var(--busy); }
+.chip.pr { background: var(--done-bg); color: var(--done); }
+.chip.lines .add { color: var(--done); }
+.chip.lines .del { color: var(--bad); }
+.away { border-left: 3px solid var(--busy); padding: 6px 10px; background: var(--busy-bg); border-radius: 0 6px 6px 0; font-size: 0.85rem; overflow-wrap: anywhere; min-width: 0; }
+.away .lbl { display: block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--busy); margin-bottom: 2px; }
+.stats { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.stat { display: flex; flex-direction: column; min-width: 0; }
+.stat-k { font-size: 0.72rem; color: var(--muted); }
+.stat-v { font-size: 0.9rem; font-weight: 600; }
+.stat.warn .stat-v { color: var(--stale); }
+.links { display: flex; flex-wrap: wrap; gap: 4px 12px; min-width: 0; }
+.links .section-lbl { flex-basis: 100%; }
+.links a { color: var(--accent, var(--busy)); overflow-wrap: anywhere; min-width: 0; }
