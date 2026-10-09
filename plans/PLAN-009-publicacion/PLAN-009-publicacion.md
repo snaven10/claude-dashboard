@@ -25,7 +25,7 @@ Este plan limpia el árbol, agrega licencia, reescribe el historial y publica.
 ## 3. Tasks y orden
 | Task | Qué | Especialista | Modelo | Depende de | Estado |
 |------|-----|--------------|--------|------------|--------|
-| **TASK-020** | Limpiar árbol: fixtures, tests, comentarios, planes, agente; `LICENSE` MIT; README de instalación | claude-dashboard-worker | sonnet | — | `pending` |
+| **TASK-020** | Limpiar árbol: fixtures, tests, comentarios, planes, agente; `LICENSE` MIT; README de instalación | claude-dashboard-worker | sonnet | — | `done` |
 | **TASK-021** | Reescribir historial y publicar (gate del usuario antes del push) | orquestador | — | TASK-020 | `pending` |
 
 ### Paralelismo
