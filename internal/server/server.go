@@ -35,6 +35,8 @@ type Server struct {
 	Activity func(cwd, sessionID string, now time.Time) (*transcript.Context, *transcript.Rate, error)
 	Timeline func(cwd, sessionID string) ([]transcript.Event, error)
 	Errors   func(cwd, sessionID string, now time.Time) (*transcript.ErrorStats, error)
+	// Extras: prs, artifacts, lines, permissionMode y subagents (PLAN-008, DD-35).
+	Extras func(cwd, sessionID string, now time.Time) (*transcript.Extras, error)
 	// ErrorsWarn: errors.high si count >= ErrorsWarn (PLAN-005 DD-22); 0 desactiva.
 	ErrorsWarn int
 	// Umbrales de PLAN-003; 0 desactiva el aviso correspondiente.

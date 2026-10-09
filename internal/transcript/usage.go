@@ -50,6 +50,13 @@ type usageState struct {
 	// PLAN-005 (DD-22): timestamps (ms) de tool_result con is_error, últimos 10 min
 	// respecto del más nuevo. Rechazos del usuario e interrupciones no entran.
 	errTimes []int64
+
+	// PLAN-008 (DD-35): PRs, artifacts, líneas y modo de permisos. Pueden estar
+	// al principio del archivo, por eso viven en el acumulador y no en la cola.
+	prs            []PR
+	artifacts      []Artifact
+	lines          *Lines
+	permissionMode string
 }
 
 // errWindowMin es la ventana de errores, en minutos (DD-22).
@@ -96,6 +103,7 @@ type usageResult struct {
 	context *Context
 	rate    *Rate
 	errors  *ErrorStats
+	extras  *Extras
 }
 
 var (
@@ -220,6 +228,7 @@ func scan(path string, now time.Time) (*usageResult, error) {
 		st.offset, st.totals, st.lastMessageID, st.counted = 0, Tokens{}, "", false
 		st.lastContext, st.compactions, st.lastCompactAt, st.lastPreTokens, st.recent = 0, 0, 0, 0, nil
 		st.errTimes = nil
+		st.prs, st.artifacts, st.lines, st.permissionMode = nil, nil, nil, ""
 	}
 	if size > st.offset {
 		first := st.offset == 0
@@ -262,7 +271,7 @@ func scan(path string, now time.Time) (*usageResult, error) {
 
 // result arma la vista; st.mu tiene que estar tomado.
 func (st *usageState) result(now time.Time) *usageResult {
-	res := &usageResult{}
+	res := &usageResult{extras: st.extrasView()}
 	// errores: independientes de que haya mensajes con usage
 	{
 		from := now.Add(-errWindowMin * time.Minute).UnixMilli()
@@ -414,6 +423,12 @@ func (st *usageState) consume(data []byte) {
 		data = data[i+1:]
 		raw = bytes.TrimSpace(raw)
 		if len(raw) == 0 {
+			continue
+		}
+		// Filtro barato (bytes.Contains) antes de cualquier Unmarshal: esto
+		// corre sobre GBs al arrancar.
+		if kind := extraKind(raw); kind != "" {
+			st.consumeExtra(kind, raw)
 			continue
 		}
 		var l usageLine

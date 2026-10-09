@@ -263,3 +263,56 @@ func TestAskQuestionTruncatesTo300Runes(t *testing.T) {
 		t.Fatalf("ask = %+v, quiero la pregunta truncada a 300 runas", d.Ask)
 	}
 }
+
+func userAt(ts, text string) string {
+	return fmt.Sprintf(`{"type":"user","timestamp":%q,"message":{"role":"user","content":%q}}`+"\n", ts, text)
+}
+
+func awayAt(ts, text string) string {
+	return fmt.Sprintf(`{"type":"system","subtype":"away_summary","content":%q,"timestamp":%q}`+"\n", text, ts)
+}
+
+func TestSummaryAwayAfterLastPrompt(t *testing.T) {
+	_, path := usageSetup(t)
+	long := strings.Repeat("ñ", 450) + "\n  segunda línea"
+	body := userAt("2026-01-01T10:00:00.000Z", "hacé algo") +
+		awayAt("2026-01-01T10:05:00.000Z", long)
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d, err := Summary("/work/usage", "sess-u")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Away == nil {
+		t.Fatal("away posterior al prompt tiene que salir")
+	}
+	if n := len([]rune(d.Away.Text)); n != 400 || strings.ContainsAny(d.Away.Text, "\n") {
+		t.Errorf("away debe ser una línea de 400 runas, tiene %d", n)
+	}
+	if want := time.Date(2026, 1, 1, 10, 5, 0, 0, time.UTC).UnixMilli(); d.Away.At != want {
+		t.Errorf("away.at = %d, want %d", d.Away.At, want)
+	}
+	if want := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC).UnixMilli(); d.TurnStartedAt != want {
+		t.Errorf("turnStartedAt = %d, want %d (timestamp del último prompt real)", d.TurnStartedAt, want)
+	}
+}
+
+func TestSummaryAwayBeforeLastPromptIsNil(t *testing.T) {
+	_, path := usageSetup(t)
+	body := awayAt("2026-01-01T10:00:00.000Z", "viejo") +
+		userAt("2026-01-01T10:05:00.000Z", "nuevo prompt")
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d, err := Summary("/work/usage", "sess-u")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Away != nil {
+		t.Errorf("away anterior al último prompt no aplica: %+v", d.Away)
+	}
+	if d.TurnStartedAt == 0 {
+		t.Error("turnStartedAt debería estar")
+	}
+}
