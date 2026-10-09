@@ -292,9 +292,83 @@
     });
   }
 
+  // ---- PLAN-007: bandeja ----
+
+  // DD-30: waiting/blocked con última actividad (o inicio) de hace MÁS de 24 h. Presentación, no borrado.
+  function isAbandoned(s, now) {
+    if (!s || !isWaiting(s.status)) return false;
+    var t = s.lastActivityAt || s.startedAt;
+    if (!t) return false;
+    return now - t > DAY_MS;
+  }
+
+  // Contadores del encabezado/favicon/título: las abandonadas no cuentan como "esperándote".
+  function counts(list, now) {
+    var c = { waiting: 0, busy: 0, idle: 0 };
+    (Array.isArray(list) ? list : []).forEach(function (s) {
+      if (isWaiting(s.status)) { if (!isAbandoned(s, now)) c.waiting++; }
+      else if (s.status === 'busy') c.busy++;
+      else if (s.status !== 'done') c.idle++;
+    });
+    return c;
+  }
+
+  // DD-32: franja "Te esperan": waiting/blocked no abandonadas, la más reciente primero.
+  function inboxItems(list, now) {
+    return (Array.isArray(list) ? list : []).filter(function (s) {
+      return isWaiting(s.status) && !isAbandoned(s, now);
+    }).sort(function (a, b) {
+      return (b.lastActivityAt || b.startedAt || 0) - (a.lastActivityAt || a.startedAt || 0);
+    });
+  }
+
+  function splitAbandoned(list, now) {
+    var live = [];
+    var abandoned = [];
+    list.forEach(function (s) { (isAbandoned(s, now) ? abandoned : live).push(s); });
+    return { live: live, abandoned: abandoned };
+  }
+
+  // DD-34: j/k sobre la lista visible; en los bordes se queda (no da la vuelta).
+  // Sin selección válida cae en el primero. Lista vacía → null.
+  function stepSelection(keys, current, delta) {
+    if (!Array.isArray(keys) || !keys.length) return null;
+    var i = keys.indexOf(current);
+    if (i === -1) return keys[0];
+    return keys[Math.max(0, Math.min(keys.length - 1, i + delta))];
+  }
+
+  // DD-33: saca el markdown más ruidoso. El resto (incluido HTML hostil) queda como texto literal:
+  // quien lo pinta usa textContent.
+  function plainText(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, '')
+      .replace(/\*\*/g, '')
+      .replace(/__/g, '')
+      .replace(/`/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function oneLine(s) {
+    return s == null ? '' : String(s).replace(/\s+/g, ' ').trim();
+  }
+
+  // DD-32: "hoy X output · N sesiones" del último día de /api/history; null si no está listo.
+  function todayView(d) {
+    if (!d || d.ready === false || !Array.isArray(d.days) || !d.days.length) return null;
+    var last = d.days[d.days.length - 1];
+    if (!last) return null;
+    return { output: formatTokens(last.output), sessions: typeof last.sessions === 'number' ? last.sessions : 0 };
+  }
+
   if (typeof document === 'undefined') {
     if (typeof module !== 'undefined' && module.exports) {
       module.exports = {
+        isAbandoned: isAbandoned, counts: counts, inboxItems: inboxItems, splitAbandoned: splitAbandoned,
+        stepSelection: stepSelection, plainText: plainText, oneLine: oneLine, todayView: todayView,
         notifyTargets: notifyTargets, formatTokens: formatTokens, totalTokens: totalTokens,
         groupByPlan: groupByPlan, orqLabel: orqLabel, planKey: planKey, planHeading: planHeading, planProgress: planProgress,
         askView: askView, errorsView: errorsView, faviconLabel: faviconLabel,
@@ -327,7 +401,6 @@
   var RANK = { waiting: 0, blocked: 0, busy: 1, idle: 2, done: 3 };
 
   var $ = function (id) { return document.getElementById(id); };
-  var grid = $('grid');
   var selProject = $('f-project');
   var chkDone = $('f-done');
   var chkIdle = $('f-idle');
@@ -379,7 +452,7 @@
 
   function ago(ms) {
     if (!ms) return '—';
-    var s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+    var s = Math.max(0, Math.floor((nowMs() - ms) / 1000));
     if (s < 60) return 'hace ' + s + ' s';
     var m = Math.floor(s / 60);
     if (m < 60) return 'hace ' + m + ' min';
@@ -448,130 +521,6 @@
     });
   }
 
-  function card(s) {
-    var st = statusOf(s);
-    var c = el('article', 'card s-' + st);
-
-    var head = el('div', 'card-head');
-    head.appendChild(el('div', 'title', s.title || s.name || s.id));
-    var sb = el('span', 'badge s-' + st, STATUS_ICON[st] + ' ' + STATUS_LABEL[st]);
-    var ev = errorsView(s.errors);
-    if (ev && !ev.badge) sb.title = ev.title;
-    head.appendChild(sb);
-    c.appendChild(head);
-
-    var meta = el('div', 'meta');
-    meta.appendChild(el('span', null, s.project || '—'));
-    if (s.name && s.name !== s.title) meta.appendChild(el('span', null, s.name));
-    meta.appendChild(el('span', null, ago(s.lastActivityAt || s.startedAt)));
-    if (s.remote) {
-      var r = el('span', null, '📡 remoto');
-      r.title = 'Sesión con bridge remoto';
-      meta.appendChild(r);
-    }
-    c.appendChild(meta);
-
-    if (typeof s.branch === 'string' && s.branch) {
-      var br = el('div', 'branch', '⎇ ' + s.branch);
-      br.title = s.branch;
-      c.appendChild(br);
-    }
-
-    if (ev && ev.badge) {
-      var eb = el('span', 'badge errors', ev.badge);
-      eb.title = ev.title;
-      c.appendChild(eb);
-    }
-
-    var av = askView(s);
-    if (av) {
-      var ask = el('div', 'ask ask-' + av.mode);
-      ask.appendChild(el('span', 'ask-label', av.label));
-      ask.appendChild(el('span', 'ask-text', av.text));
-      if (av.more) ask.appendChild(el('span', 'ask-more', av.more));
-      c.appendChild(ask);
-    }
-
-    if (s.stale) {
-      c.appendChild(el('span', 'badge stale', '⚠ sin actividad ' + ago(s.lastActivityAt)));
-    }
-
-    if (s.orq) {
-      var ol = orqLabel(s.orq);
-      if (ol) {
-        var ob = el('div', 'orq', ol);
-        ob.title = 'Worker de orq' + (s.orq.ws ? ' · ws ' + s.orq.ws : '') + (s.orq.job ? ' · job ' + s.orq.job : '');
-        c.appendChild(ob);
-      }
-    }
-
-    if (s.waitingFor) c.appendChild(el('div', 'waiting-for', s.waitingFor));
-
-    if (s.lastPrompt) {
-      var p = el('p', 'prompt' + (expanded.has(s.id) ? ' open' : ''), s.lastPrompt);
-      p.title = 'Click para expandir/colapsar';
-      p.addEventListener('click', function () {
-        if (expanded.has(s.id)) expanded.delete(s.id); else expanded.add(s.id);
-        p.classList.toggle('open');
-      });
-      c.appendChild(p);
-    }
-
-    if (s.lastAction && s.lastAction.text) {
-      var prefix = s.lastAction.kind === 'tool' ? '▸ ' : '“ ';
-      c.appendChild(el('div', 'action', prefix + s.lastAction.text));
-    }
-
-    if (s.tokens) {
-      var tk = s.tokens;
-      var tt = el('div', 'tokens', '🔢 ' + formatTokens(totalTokens(tk)) + ' tokens' + (tk.model ? ' · ' + tk.model : ''));
-      tt.title = 'input ' + (tk.input || 0) + ' · output ' + (tk.output || 0) +
-        ' · cache leído ' + (tk.cacheRead || 0) + ' · cache creado ' + (tk.cacheCreation || 0);
-      c.appendChild(tt);
-    }
-
-    var ctxText = formatContext(s.context);
-    if (ctxText) {
-      var cx = el('div', 'context' + (s.context.warn ? ' warn' : ''), ctxText);
-      cx.title = contextTitle(s.context);
-      c.appendChild(cx);
-    }
-
-    if (s.rate && s.rate.high) {
-      var rb = el('span', 'badge rate', '⚡ ritmo inusual');
-      rb.title = rateTitle(s.rate);
-      c.appendChild(rb);
-    }
-
-    var mode = phoneMode(s);
-    if (mode === 'enable') {
-      c.appendChild(el('div', 'remote-hint', '📱 Para abrirla en el teléfono, activalo escribiendo /remote-control (o /rc) en esa sesión; el QR aparece solo en ~3 s.'));
-    }
-
-    var foot = el('div', 'card-foot');
-    if (mode === 'qr') {
-      var ph = el('button', null, '📱 abrir en el teléfono');
-      ph.type = 'button';
-      ph.addEventListener('click', function (ev) { ev.stopPropagation(); openPhone(s, ph); });
-      foot.appendChild(ph);
-    }
-    var tl = el('button', null, 'línea de tiempo');
-    tl.type = 'button';
-    tl.addEventListener('click', function (ev) { ev.stopPropagation(); openTimeline(s, tl); });
-    foot.appendChild(tl);
-    var btn = el('button', null, 'copiar comando');
-    btn.type = 'button';
-    btn.addEventListener('click', function () { copyText(copyCommand(s), btn); });
-    foot.appendChild(btn);
-    c.appendChild(foot);
-    var warn = resumeWarning(s);
-    if (warn) c.appendChild(el('div', 'resume-warn', warn));
-    c.addEventListener('click', function (ev) {
-      if (ev.target.closest('button, .prompt, a')) return;
-      openTimeline(s, null);
-    });
-    return c;
-  }
 
   // ---- Favicon con número (DD-25) ----
 
@@ -629,83 +578,6 @@
     selProject.value = filters.project;
   }
 
-  function render() {
-    var counts = { waiting: 0, busy: 0, idle: 0 };
-    sessions.forEach(function (s) {
-      var st = statusOf(s);
-      if (st === 'waiting' || st === 'blocked') counts.waiting++;
-      else if (st === 'busy') counts.busy++;
-      else if (st === 'idle') counts.idle++;
-    });
-    $('n-waiting').textContent = counts.waiting;
-    $('n-busy').textContent = counts.busy;
-    $('n-idle').textContent = counts.idle;
-    STATUS_FILTERS.forEach(function (f) {
-      var b = $('c-' + f);
-      b.setAttribute('aria-pressed', filters.status === f ? 'true' : 'false');
-    });
-    updateFavicon(counts.waiting);
-    document.title = counts.waiting > 0 ? '(' + counts.waiting + ') esperándote — ' + BASE_TITLE : BASE_TITLE;
-
-    var list = sorted(visible(sessions));
-    var parts = splitOldDone(list, nowMs());
-    var nodes = [];
-    if (groupByPlanOn) {
-      groupByPlan(parts.recent).forEach(function (g) {
-        var sec = el('section', 'group');
-        var h = el('h2', 'group-head', planHeading(g));
-        if (g.info && g.info.name) h.title = g.info.name;
-        h.appendChild(el('span', 'group-count', g.sessions.length + (g.waiting ? ' · ' + g.waiting + ' esperándote' : '')));
-        var pt = planTotals(g.sessions);
-        var tot = el('span', 'group-tokens', '🔢 ' + formatTokens(pt.total) + ' tokens · output ' + formatTokens(pt.output));
-        tot.title = 'Suma de las sesiones que Claude todavía lista; las borradas con `claude rm` no cuentan.';
-        h.appendChild(tot);
-        sec.appendChild(h);
-        if (g.info && typeof g.info.total === 'number' && g.info.total > 0) {
-          var bar = el('div', 'progress');
-          bar.setAttribute('role', 'progressbar');
-          bar.setAttribute('aria-label', 'Avance de ' + (g.info.name || planHeading(g)));
-          bar.setAttribute('aria-valuemin', '0');
-          bar.setAttribute('aria-valuemax', String(g.info.total));
-          bar.setAttribute('aria-valuenow', String(g.info.done || 0));
-          bar.setAttribute('aria-valuetext', (g.info.done || 0) + ' de ' + g.info.total + ' tareas hechas');
-          var fill = el('div', 'progress-fill');
-          fill.style.width = Math.round(planProgress(g.info) * 100) + '%';
-          bar.appendChild(fill);
-          sec.appendChild(bar);
-        }
-        var inner = el('div', 'grid');
-        g.sessions.forEach(function (s) { inner.appendChild(card(s)); });
-        sec.appendChild(inner);
-        nodes.push(sec);
-      });
-      grid.className = 'groups';
-    } else {
-      grid.className = 'grid';
-      nodes = parts.recent.map(card);
-    }
-    if (parts.old.length) {
-      var old = el('section', 'old-done');
-      old.style.gridColumn = '1 / -1';
-      var tg = el('button', 'old-toggle', (showOldOn ? '▾ ' : '▸ ') + parts.old.length + ' terminadas hace más de 1 día');
-      tg.type = 'button';
-      tg.setAttribute('aria-expanded', showOldOn ? 'true' : 'false');
-      tg.addEventListener('click', function () {
-        showOldOn = !showOldOn;
-        writeFlag(OLD_KEY, showOldOn);
-        render();
-      });
-      old.appendChild(tg);
-      if (showOldOn) {
-        var og = el('div', 'grid');
-        parts.old.forEach(function (s) { og.appendChild(card(s)); });
-        old.appendChild(og);
-      }
-      nodes.push(old);
-    }
-    grid.replaceChildren.apply(grid, nodes);
-    $('empty').hidden = list.length > 0;
-  }
 
   // ---- Avisos (DD-12) ----
 
@@ -750,113 +622,6 @@
     });
   }
 
-  // ---- Abrir en el teléfono (DD-19/DD-20) ----
-
-  var phoneFocus = null;
-
-  function closePhone() {
-    var p = $('phone');
-    if (p.hidden) return;
-    p.hidden = true;
-    if (phoneFocus && phoneFocus.isConnected) phoneFocus.focus();
-    phoneFocus = null;
-  }
-
-  // Pinta la matriz en un canvas: fondo blanco SIEMPRE y margen de 4 módulos (quiet zone).
-  function drawQr(canvas, rows) {
-    var quiet = 4;
-    var cell = 6;
-    var n = rows.length;
-    var size = (n + quiet * 2) * cell;
-    canvas.width = size;
-    canvas.height = size;
-    var ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, size, size);
-    ctx.fillStyle = '#000000';
-    for (var r = 0; r < n; r++) {
-      for (var c = 0; c < n; c++) {
-        if (rows[r][c]) ctx.fillRect((c + quiet) * cell, (r + quiet) * cell, cell, cell);
-      }
-    }
-  }
-
-  function openPhone(s, opener) {
-    if (!validRemoteUrl(s.remoteUrl)) return;
-    var rows;
-    try { rows = qrMatrix(s.remoteUrl); } catch (e) { rows = []; }
-    var body = $('phone-body');
-    body.replaceChildren();
-    $('phone-title').textContent = 'Abrir en el teléfono — ' + (s.title || s.name || s.id);
-    if (rows.length) {
-      var canvas = el('canvas', 'qr');
-      canvas.setAttribute('role', 'img');
-      canvas.setAttribute('aria-label', 'Código QR con el link de la sesión');
-      drawQr(canvas, rows);
-      body.appendChild(canvas);
-    } else {
-      body.appendChild(el('p', 'empty', 'No se pudo generar el QR; usá el link.'));
-    }
-    body.appendChild(el('p', 'phone-help', 'Escaneá el QR con la cámara del teléfono, o abrí el link.'));
-    var a = el('a', 'phone-link', s.remoteUrl);
-    a.href = s.remoteUrl;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    body.appendChild(a);
-    var cp = el('button', null, 'copiar link');
-    cp.type = 'button';
-    cp.addEventListener('click', function () { copyText(s.remoteUrl, cp); });
-    body.appendChild(cp);
-
-    phoneFocus = opener || document.activeElement;
-    $('phone').hidden = false;
-    $('phone-close').focus();
-  }
-
-  // ---- Línea de tiempo ----
-
-  function closeTimeline() {
-    var p = $('timeline');
-    if (p.hidden) return;
-    p.hidden = true;
-    if (lastFocus && lastFocus.isConnected) lastFocus.focus();
-    lastFocus = null;
-  }
-
-  function openTimeline(s, opener) {
-    var p = $('timeline');
-    lastFocus = opener || document.activeElement;
-    $('timeline-title').textContent = s.title || s.name || s.id;
-    var body = $('timeline-body');
-    body.replaceChildren(el('p', 'empty', 'Cargando…'));
-    p.hidden = false;
-    $('timeline-close').focus();
-
-    var url = FIXTURE ? 'fixture-timeline.json'
-      : '/api/sessions/' + encodeURIComponent(s.sessionId) + '/timeline';
-    fetch(url)
-      .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
-      .then(function (d) {
-        if (p.hidden || $('timeline-title').textContent !== (s.title || s.name || s.id)) return;
-        var evs = d && Array.isArray(d.events) ? d.events : [];
-        if (!evs.length) { body.replaceChildren(el('p', 'empty', 'Sin eventos.')); return; }
-        var ol = el('ol', 'events');
-        evs.forEach(function (ev) {
-          var kind = ev && (ev.kind === 'prompt' || ev.kind === 'tool') ? ev.kind : 'text';
-          var li = el('li', 'ev ev-' + kind);
-          var when = el('time', 'ev-at', ev && ev.at ? new Date(ev.at).toLocaleTimeString() : '—');
-          var tag = el('span', 'ev-kind', kind === 'prompt' ? 'prompt' : kind === 'tool' ? 'herramienta' : 'texto');
-          li.appendChild(when);
-          li.appendChild(tag);
-          li.appendChild(el('div', 'ev-text', ev && ev.text != null ? String(ev.text) : ''));
-          ol.appendChild(li);
-        });
-        body.replaceChildren(ol);
-      })
-      .catch(function () {
-        if (!p.hidden) body.replaceChildren(el('p', 'empty', 'No se pudo cargar la línea de tiempo.'));
-      });
-  }
 
   // ---- Historial ----
 
@@ -957,10 +722,12 @@
 
   function setSnapshot(data) {
     var next = data && Array.isArray(data.sessions) ? data.sessions : [];
-    fireNotifications(notifyTargets(prevSessions, next));
+    if (FIXTURE && data && typeof data.generatedAt === 'number') fixtureNow = data.generatedAt;
+    var now = nowMs();
+    // DD-30: las abandonadas no avisan
+    fireNotifications(notifyTargets(prevSessions, next).filter(function (s) { return !isAbandoned(s, now); }));
     prevSessions = next;
     sessions = next;
-    if (FIXTURE && data && typeof data.generatedAt === 'number') fixtureNow = data.generatedAt;
     updateProjects();
     render();
   }
@@ -987,6 +754,557 @@
     };
   }
 
+
+  // ---- Bandeja (PLAN-007) ----
+
+  var SEL_KEY = 'claude-dashboard.selected';
+  var ABN_KEY = 'claude-dashboard.showAbandoned';
+  var showAbandonedOn = readFlag(ABN_KEY);
+  var selectedKey = readSelected();
+  var phoneDetail = false; // teléfono: pantalla de detalle abierta
+  var qrOpenFor = ''; // clave de la sesión con el QR desplegado en el detalle
+  var navKeys = []; // claves en el orden en que se ven las filas (para j/k)
+  var detailSig = '';
+  var historyToday = null;
+  var timeline = { key: '', at: 0, status: 'idle', events: [], req: 0, version: 0 };
+
+  function readSelected() {
+    try { return localStorage.getItem(SEL_KEY) || ''; } catch (e) { return ''; }
+  }
+
+  function saveSelected(k) {
+    try { localStorage.setItem(SEL_KEY, k); } catch (e) { /* ignorar */ }
+  }
+
+  function isPhone() {
+    return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 760px)').matches;
+  }
+
+  function titleOf(s) { return plainText(s.title || s.name || s.id); }
+
+  function btn(label, cls) {
+    var b = el('button', cls || null, label);
+    b.type = 'button';
+    return b;
+  }
+
+  function chip(cls, text, title) {
+    var c = el('span', 'chip ' + cls, text);
+    if (title) c.title = title;
+    return c;
+  }
+
+  // Alertas de una fila. En el detalle el contexto va en su propia línea, no como chip.
+  function chipsFor(s, inDetail) {
+    var w = el('div', 'chips');
+    var ev = errorsView(s.errors);
+    if (ev && ev.badge) w.appendChild(chip('err', ev.badge, ev.title));
+    if (s.rate && s.rate.high) w.appendChild(chip('warn', '⚡ ritmo inusual', rateTitle(s.rate)));
+    if (!inDetail && s.context && s.context.warn) {
+      w.appendChild(chip('warn', '⚠ contexto ' + formatTokens(s.context.current), contextTitle(s.context)));
+    }
+    if (s.stale) w.appendChild(chip('warn', '⚠ sin actividad ' + ago(s.lastActivityAt)));
+    return w.childNodes.length ? w : null;
+  }
+
+  function row(s) {
+    var key = sessionKey(s);
+    var st = statusOf(s);
+    var r = el('button', 'row s-' + st);
+    r.type = 'button';
+    r.setAttribute('role', 'option');
+    r.dataset.key = key;
+    r.setAttribute('aria-selected', key === selectedKey ? 'true' : 'false');
+    var dot = el('span', 'dot d-' + st);
+    dot.setAttribute('aria-hidden', 'true');
+    r.appendChild(dot);
+
+    var main = el('span', 'row-main');
+    main.appendChild(el('span', 'row-title', titleOf(s)));
+    var av = st === 'idle' ? askView(s) : null;
+    var sub = av ? plainText(av.text) : [s.project, s.branch ? '⎇ ' + s.branch : null].filter(Boolean).join(' · ');
+    main.appendChild(el('span', 'row-sub', sub));
+    var chips = chipsFor(s, false);
+    if (chips) main.appendChild(chips);
+    r.appendChild(main);
+
+    var side = el('span', 'row-side');
+    side.appendChild(el('span', 'row-st st-' + st, STATUS_LABEL[st]));
+    side.appendChild(el('span', 'num', ago(s.lastActivityAt || s.startedAt)));
+    if (s.context && typeof s.context.current === 'number') {
+      var bar = el('span', 'bar ctx');
+      bar.title = formatContext(s.context);
+      var fill = el('i');
+      fill.style.width = Math.max(0, Math.min(100, s.context.current / 10000)) + '%';
+      if (s.context.warn) fill.className = 'warn';
+      bar.appendChild(fill);
+      side.appendChild(bar);
+    }
+    r.appendChild(side);
+    r.addEventListener('click', function () { select(key, true); });
+    return r;
+  }
+
+  function groupHead(g) {
+    var h = el('div', 'group-h');
+    var t = el('div');
+    t.appendChild(el('strong', null, planHeading(g)));
+    if (g.info && g.info.name) h.title = g.info.name;
+    t.appendChild(document.createTextNode(' · ' + g.sessions.length + (g.waiting ? ' · ' + g.waiting + ' esperándote' : '')));
+    var pt = planTotals(g.sessions);
+    var tot = el('span', 'group-tokens', ' · 🔢 ' + formatTokens(pt.total) + ' tokens · output ' + formatTokens(pt.output));
+    tot.title = 'Suma de las sesiones que Claude todavía lista; las borradas con `claude rm` no cuentan.';
+    t.appendChild(tot);
+    h.appendChild(t);
+    if (g.info && typeof g.info.total === 'number' && g.info.total > 0) {
+      var bar = el('div', 'bar');
+      bar.setAttribute('role', 'progressbar');
+      bar.setAttribute('aria-label', 'Avance de ' + (g.info.name || planHeading(g)));
+      bar.setAttribute('aria-valuemin', '0');
+      bar.setAttribute('aria-valuemax', String(g.info.total));
+      bar.setAttribute('aria-valuenow', String(g.info.done || 0));
+      bar.setAttribute('aria-valuetext', (g.info.done || 0) + ' de ' + g.info.total + ' tareas hechas');
+      var fill = el('i');
+      fill.style.width = Math.round(planProgress(g.info) * 100) + '%';
+      bar.appendChild(fill);
+      h.appendChild(bar);
+    }
+    return h;
+  }
+
+  // Sección plegable (terminadas viejas / abandonadas).
+  function fold(label, open, onToggle, items) {
+    var sec = el('div', 'fold');
+    var tg = btn((open ? '▾ ' : '▸ ') + label, 'fold-toggle');
+    tg.setAttribute('aria-expanded', open ? 'true' : 'false');
+    tg.addEventListener('click', onToggle);
+    sec.appendChild(tg);
+    if (open) items.forEach(function (s) { navKeys.push(sessionKey(s)); sec.appendChild(row(s)); });
+    return sec;
+  }
+
+  function renderList(now) {
+    var vis = sorted(visible(sessions));
+    var ab = splitAbandoned(vis, now);
+    var parts = splitOldDone(ab.live, now);
+    var nodes = [];
+    navKeys = [];
+    function add(s) { navKeys.push(sessionKey(s)); nodes.push(row(s)); }
+    if (groupByPlanOn) {
+      groupByPlan(parts.recent).forEach(function (g) {
+        nodes.push(groupHead(g));
+        g.sessions.forEach(add);
+      });
+    } else {
+      parts.recent.forEach(add);
+    }
+    if (parts.old.length) {
+      nodes.push(fold(parts.old.length + ' terminadas hace más de 1 día', showOldOn, function () {
+        showOldOn = !showOldOn;
+        writeFlag(OLD_KEY, showOldOn);
+        render();
+      }, parts.old));
+    }
+    if (ab.abandoned.length) {
+      nodes.push(fold(ab.abandoned.length + ' abandonadas: esperan hace más de 24 h. No cuentan en el contador ni en los avisos; no se borra nada.',
+        showAbandonedOn, function () {
+          showAbandonedOn = !showAbandonedOn;
+          writeFlag(ABN_KEY, showAbandonedOn);
+          render();
+        }, ab.abandoned));
+    }
+    var rows = $('rows');
+    rows.replaceChildren.apply(rows, nodes);
+    $('empty').hidden = vis.length > 0;
+  }
+
+  function renderInbox(now) {
+    var items = inboxItems(sessions, now);
+    $('inbox-title').textContent = 'Te esperan' + (items.length ? ' (' + items.length + ')' : '');
+    var box = $('inbox-items');
+    if (!items.length) {
+      box.replaceChildren(el('p', 'inbox-empty', 'Nadie te espera.'));
+      return;
+    }
+    box.replaceChildren.apply(box, items.map(function (s) {
+      var key = sessionKey(s);
+      var c = el('article', 'ask-card');
+      var h = el('header');
+      h.appendChild(el('strong', null, titleOf(s)));
+      h.appendChild(el('span', 'help', ago(s.lastActivityAt || s.startedAt)));
+      c.appendChild(h);
+      c.appendChild(el('div', 'meta', [s.project, s.branch ? '⎇ ' + s.branch : null].filter(Boolean).join(' · ')));
+      var av = askView(s);
+      var q = el('div', 'ask-q');
+      if (av) {
+        q.appendChild(el('span', 'lbl', av.label));
+        q.appendChild(document.createTextNode(plainText(av.text)));
+        if (av.more) q.appendChild(el('div', 'lbl', av.more));
+      } else {
+        q.appendChild(document.createTextNode(s.waitingFor || 'necesita tu atención'));
+      }
+      c.appendChild(q);
+      var a = el('div', 'ask-actions');
+      var open = btn('ver detalle');
+      open.addEventListener('click', function () { select(key, true); });
+      a.appendChild(open);
+      if (validRemoteUrl(s.remoteUrl)) {
+        var ph = btn('📱');
+        ph.title = 'Abrir en el teléfono (QR)';
+        ph.setAttribute('aria-label', 'Abrir en el teléfono');
+        ph.addEventListener('click', function () { qrOpenFor = key; select(key, true); });
+        a.appendChild(ph);
+      }
+      c.appendChild(a);
+      return c;
+    }));
+  }
+
+  function renderToday() {
+    var t = $('today');
+    var v = historyToday;
+    t.hidden = !v;
+    if (!v) return;
+    t.replaceChildren(document.createTextNode('hoy '), el('b', 'num', v.output),
+      document.createTextNode(' output · '), el('b', 'num', String(v.sessions)),
+      document.createTextNode(v.sessions === 1 ? ' sesión' : ' sesiones'));
+  }
+
+  function loadToday() {
+    fetch(FIXTURE ? 'fixture-history.json' : '/api/history')
+      .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+      .then(function (d) { historyToday = todayView(d); renderToday(); })
+      .catch(function () { /* sin historial: el resumen queda oculto */ });
+  }
+
+  // ---- Detalle ----
+
+  function selectedSession() {
+    for (var i = 0; i < sessions.length; i++) if (sessionKey(sessions[i]) === selectedKey) return sessions[i];
+    return null;
+  }
+
+  // La línea de tiempo se pide al seleccionar y cuando cambia lastActivityAt (no en cada snapshot).
+  function ensureTimeline(s) {
+    var key = sessionKey(s);
+    var at = s.lastActivityAt || 0;
+    var t = timeline;
+    if (t.key === key && t.at === at) return;
+    var fresh = t.key !== key;
+    t.key = key;
+    t.at = at;
+    if (fresh) { t.status = 'loading'; t.events = []; }
+    t.version++;
+    var req = ++t.req;
+    var url = FIXTURE ? 'fixture-timeline.json' : '/api/sessions/' + encodeURIComponent(s.sessionId) + '/timeline';
+    fetch(url)
+      .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+      .then(function (d) {
+        if (req !== t.req) return;
+        t.events = d && Array.isArray(d.events) ? d.events : [];
+        t.status = 'ok';
+        t.version++;
+        render();
+      })
+      .catch(function () {
+        if (req !== t.req) return;
+        if (fresh) t.status = 'err';
+        t.version++;
+        render();
+      });
+  }
+
+  function timelineNode() {
+    var t = timeline;
+    if (t.status === 'loading') return el('p', 'empty', 'Cargando…');
+    if (t.status === 'err') return el('p', 'empty', 'No se pudo cargar la línea de tiempo.');
+    if (!t.events.length) return el('p', 'empty', 'Sin eventos.');
+    var ol = el('ol', 'events');
+    t.events.forEach(function (ev) {
+      var kind = ev && (ev.kind === 'prompt' || ev.kind === 'tool') ? ev.kind : 'text';
+      var li = el('li', 'ev ev-' + kind);
+      li.appendChild(el('time', 'ev-at', ev && ev.at ? new Date(ev.at).toLocaleTimeString() : '—'));
+      li.appendChild(el('span', 'ev-kind', kind === 'prompt' ? 'prompt' : kind === 'tool' ? 'herramienta' : 'texto'));
+      li.appendChild(el('div', 'ev-text', ev && ev.text != null ? String(ev.text) : ''));
+      ol.appendChild(li);
+    });
+    return ol;
+  }
+
+  // Pinta la matriz en un canvas: fondo blanco SIEMPRE y margen de 4 módulos (quiet zone).
+  function drawQr(canvas, rows) {
+    var quiet = 4;
+    var cell = 6;
+    var n = rows.length;
+    var size = (n + quiet * 2) * cell;
+    canvas.width = size;
+    canvas.height = size;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#000000';
+    for (var r = 0; r < n; r++) {
+      for (var c = 0; c < n; c++) {
+        if (rows[r][c]) ctx.fillRect((c + quiet) * cell, (r + quiet) * cell, cell, cell);
+      }
+    }
+  }
+
+  function qrBox(s) {
+    var box = el('div', 'qr-box');
+    var rows;
+    try { rows = qrMatrix(s.remoteUrl); } catch (e) { rows = []; }
+    if (rows.length) {
+      var canvas = el('canvas', 'qr');
+      canvas.setAttribute('role', 'img');
+      canvas.setAttribute('aria-label', 'Código QR con el link de la sesión');
+      drawQr(canvas, rows);
+      box.appendChild(canvas);
+    }
+    var side = el('div', 'qr-side');
+    side.appendChild(el('p', 'help', rows.length ? 'Escaneá el QR con la cámara del teléfono, o abrí el link.' : 'No se pudo generar el QR; usá el link.'));
+    var a = el('a', 'phone-link', s.remoteUrl);
+    a.href = s.remoteUrl;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    side.appendChild(a);
+    var cp = btn('copiar link');
+    cp.addEventListener('click', function () { copyText(s.remoteUrl, cp); });
+    side.appendChild(cp);
+    box.appendChild(side);
+    return box;
+  }
+
+  function buildDetail(d, s) {
+    var st = statusOf(s);
+    var key = sessionKey(s);
+    var nodes = [];
+
+    var back = btn('← volver a la lista', 'back');
+    back.addEventListener('click', function () { phoneDetail = false; render(); });
+    nodes.push(back);
+
+    var head = el('div', 'detail-head');
+    head.appendChild(el('h3', null, titleOf(s)));
+    head.appendChild(el('span', 'pill s-' + st, STATUS_ICON[st] + ' ' + STATUS_LABEL[st]));
+    nodes.push(head);
+
+    var meta = el('div', 'meta');
+    meta.appendChild(el('span', null, s.project || '—'));
+    if (s.name && s.name !== s.title) meta.appendChild(el('span', null, s.name));
+    meta.appendChild(el('span', null, ago(s.lastActivityAt || s.startedAt)));
+    if (s.remote) {
+      var rm = el('span', null, '📡 remoto');
+      rm.title = 'Sesión con bridge remoto';
+      meta.appendChild(rm);
+    }
+    nodes.push(meta);
+
+    if (typeof s.branch === 'string' && s.branch) {
+      var br = el('div', 'branch', '⎇ ' + s.branch);
+      br.title = s.branch;
+      nodes.push(br);
+    }
+
+    var chips = chipsFor(s, true);
+    if (chips) nodes.push(chips);
+
+    var av = askView(s);
+    if (av) {
+      var ask = el('div', 'ask ask-' + av.mode);
+      ask.appendChild(el('span', 'ask-label', av.label));
+      ask.appendChild(el('span', 'ask-text', plainText(av.text)));
+      if (av.more) ask.appendChild(el('span', 'ask-more', av.more));
+      nodes.push(ask);
+    }
+
+    if (s.orq) {
+      var ol = orqLabel(s.orq);
+      if (ol) {
+        var ob = el('div', 'orq', ol);
+        ob.title = 'Worker de orq' + (s.orq.ws ? ' · ws ' + s.orq.ws : '') + (s.orq.job ? ' · job ' + s.orq.job : '');
+        nodes.push(ob);
+      }
+    }
+
+    if (s.waitingFor) nodes.push(el('div', 'waiting-for', s.waitingFor));
+
+    if (s.lastPrompt) {
+      var p = el('p', 'prompt' + (expanded.has(s.id) ? ' open' : ''), plainText(s.lastPrompt));
+      p.title = 'Click para expandir/colapsar';
+      p.addEventListener('click', function () {
+        if (expanded.has(s.id)) expanded.delete(s.id); else expanded.add(s.id);
+        p.classList.toggle('open');
+      });
+      nodes.push(p);
+    }
+
+    if (s.lastAction && s.lastAction.text) {
+      var prefix = s.lastAction.kind === 'tool' ? '▸ ' : '“ ';
+      var ac = el('div', 'action', prefix + oneLine(s.lastAction.text));
+      ac.title = String(s.lastAction.text);
+      nodes.push(ac);
+    }
+
+    if (s.tokens) {
+      var tk = s.tokens;
+      var tt = el('div', 'tokens', '🔢 ' + formatTokens(totalTokens(tk)) + ' tokens' + (tk.model ? ' · ' + tk.model : ''));
+      tt.title = 'input ' + (tk.input || 0) + ' · output ' + (tk.output || 0) +
+        ' · cache leído ' + (tk.cacheRead || 0) + ' · cache creado ' + (tk.cacheCreation || 0);
+      nodes.push(tt);
+    }
+
+    var ctxText = formatContext(s.context);
+    if (ctxText) {
+      var cx = el('div', 'context' + (s.context.warn ? ' warn' : ''), ctxText);
+      cx.title = contextTitle(s.context);
+      nodes.push(cx);
+    }
+
+    var tl = el('div', 'tl-wrap');
+    tl.appendChild(el('span', 'section-lbl', 'Línea de tiempo'));
+    tl.appendChild(timelineNode());
+    nodes.push(tl);
+
+    var mode = phoneMode(s);
+    var actions = el('div', 'actions');
+    if (mode === 'qr') {
+      var ph = btn('📱 abrir en el teléfono');
+      ph.dataset.act = 'qr';
+      ph.setAttribute('aria-expanded', qrOpenFor === key ? 'true' : 'false');
+      ph.addEventListener('click', function () { qrOpenFor = qrOpenFor === key ? '' : key; render(); });
+      actions.appendChild(ph);
+    }
+    var cp = btn('copiar comando');
+    cp.dataset.act = 'copy';
+    cp.addEventListener('click', function () { copyText(copyCommand(s), cp); });
+    actions.appendChild(cp);
+    nodes.push(actions);
+
+    if (mode === 'qr' && qrOpenFor === key) nodes.push(qrBox(s));
+    if (mode === 'enable') {
+      nodes.push(el('div', 'help', '📱 Para abrirla en el teléfono, activalo escribiendo /remote-control (o /rc) en esa sesión; el QR aparece solo en ~3 s.'));
+    }
+    var warn = resumeWarning(s);
+    if (warn) nodes.push(el('div', 'help', warn));
+
+    d.replaceChildren.apply(d, nodes);
+  }
+
+  function renderDetail() {
+    var d = $('detail');
+    var s = selectedSession();
+    if (s && (!isPhone() || phoneDetail)) ensureTimeline(s);
+    var minute = s ? Math.floor((nowMs() - (s.lastActivityAt || s.startedAt || 0)) / 60000) : 0;
+    var sig = JSON.stringify([s, minute, qrOpenFor === (s && sessionKey(s)), s ? expanded.has(s.id) : false,
+      timeline.key, timeline.version, timeline.status]);
+    if (sig === detailSig) return;
+    detailSig = sig;
+    var scroll = d.scrollTop;
+    var act = d.contains(document.activeElement) && document.activeElement.dataset ? document.activeElement.dataset.act : '';
+    if (!s) {
+      d.replaceChildren(el('p', 'empty', 'Elegí una sesión de la lista.'));
+      return;
+    }
+    buildDetail(d, s);
+    d.scrollTop = scroll;
+    if (act) {
+      var again = d.querySelector('[data-act="' + act + '"]');
+      if (again) again.focus({ preventScroll: true });
+    }
+  }
+
+  function rowByKey(k) {
+    var rows = $('rows').querySelectorAll('.row');
+    for (var i = 0; i < rows.length; i++) if (rows[i].dataset.key === k) return rows[i];
+    return null;
+  }
+
+  // Un solo render para todo; conserva foco de la fila, scroll de la página, selección y detalle abierto.
+  function render(opts) {
+    opts = opts || {};
+    var now = nowMs();
+    var c = counts(sessions, now);
+    $('n-waiting').textContent = c.waiting;
+    $('n-busy').textContent = c.busy;
+    $('n-idle').textContent = c.idle;
+    STATUS_FILTERS.forEach(function (f) {
+      $('c-' + f).setAttribute('aria-pressed', filters.status === f ? 'true' : 'false');
+    });
+    updateFavicon(c.waiting);
+    document.title = c.waiting > 0 ? '(' + c.waiting + ') esperándote — ' + BASE_TITLE : BASE_TITLE;
+
+    var ae = document.activeElement;
+    var focusKey = opts.focusKey || (ae && ae.classList && ae.classList.contains('row') ? ae.dataset.key : '');
+    var y = window.scrollY;
+
+    renderInbox(now);
+    renderList(now);
+    if (sessions.length && !selectedSession()) {
+      // selección inexistente (o nunca elegida): la primera fila, sin guardarla
+      selectedKey = navKeys[0] || '';
+      var rs = $('rows').querySelectorAll('.row');
+      for (var i = 0; i < rs.length; i++) rs[i].setAttribute('aria-selected', rs[i].dataset.key === selectedKey ? 'true' : 'false');
+    }
+    renderDetail();
+    document.body.classList.toggle('phone-detail', phoneDetail && isPhone());
+
+    if (focusKey) {
+      var r = rowByKey(focusKey);
+      if (r) {
+        r.focus({ preventScroll: true });
+        if (opts.focusKey) r.scrollIntoView({ block: 'nearest' });
+      }
+    }
+    if (!opts.focusKey && Math.abs(window.scrollY - y) > 1) window.scrollTo(0, y);
+  }
+
+  function select(key, open) {
+    selectedKey = key;
+    saveSelected(key);
+    if (open && isPhone()) phoneDetail = true;
+    render({ focusKey: key });
+    if (open && isPhone()) window.scrollTo(0, 0);
+  }
+
+  function onKey(ev, search) {
+    if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    var ae = document.activeElement;
+    var tag = ae && ae.tagName;
+    var typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    if (ev.key === 'Escape') {
+      if (!$('history').hidden) { closeHistory(); return; }
+      if (search.value || ae === search) {
+        if (search.value) { search.value = ''; query = ''; render(); }
+        search.blur();
+        return;
+      }
+      if (typing) return;
+      if (qrOpenFor) { qrOpenFor = ''; render(); return; }
+      if (phoneDetail) { phoneDetail = false; render(); window.scrollTo(0, 0); }
+      return;
+    }
+    if (typing || !$('history').hidden) return;
+    var k = ev.key;
+    if (k === 'j' || k === 'ArrowDown' || k === 'k' || k === 'ArrowUp') {
+      var next = stepSelection(navKeys, selectedKey, k === 'j' || k === 'ArrowDown' ? 1 : -1);
+      if (next === null) return;
+      ev.preventDefault();
+      if (next !== selectedKey) { selectedKey = next; saveSelected(next); }
+      render({ focusKey: next });
+    } else if (k === 'Enter') {
+      if (tag === 'BUTTON' || tag === 'A' || !selectedKey) return;
+      if (isPhone()) { phoneDetail = true; render(); window.scrollTo(0, 0); }
+    } else if (k === '/') {
+      ev.preventDefault();
+      search.focus();
+    } else if (k === '1' || k === '2' || k === '3') {
+      filters.status = toggleStatusFilter(filters.status, STATUS_FILTERS[+k - 1]);
+      saveFilters();
+      render();
+    }
+  }
+
   function init() {
     chkDone.checked = filters.hideDone;
     chkIdle.checked = filters.hideIdle;
@@ -1007,34 +1325,18 @@
     chkGroup.addEventListener('change', function () { groupByPlanOn = chkGroup.checked; writeFlag(GROUP_KEY, groupByPlanOn); render(); });
     $('btn-notify').addEventListener('click', toggleNotify);
     updateNotifyBtn();
-    $('phone-close').addEventListener('click', closePhone);
-    $('phone').addEventListener('click', function (ev) { if (ev.target === $('phone')) closePhone(); });
     $('history-close').addEventListener('click', closeHistory);
     $('history').addEventListener('click', function (ev) { if (ev.target === $('history')) closeHistory(); });
     $('btn-history').addEventListener('click', function (ev) { openHistory(ev.currentTarget); });
-    $('timeline-close').addEventListener('click', closeTimeline);
-    $('timeline').addEventListener('click', function (ev) { if (ev.target === $('timeline')) closeTimeline(); });
     var search = $('f-search');
     search.addEventListener('input', function () { query = search.value; render(); });
-    document.addEventListener('keydown', function (ev) {
-      if (ev.key === 'Escape') {
-        if (!$('phone').hidden) { closePhone(); return; }
-        if (!$('history').hidden) { closeHistory(); return; }
-        if (!$('timeline').hidden) { closeTimeline(); return; }
-        if (search.value) { search.value = ''; query = ''; render(); }
-        if (document.activeElement === search) search.blur();
-        return;
-      }
-      if (ev.key === '/' && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
-        var tag = document.activeElement && document.activeElement.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-        ev.preventDefault();
-        search.focus();
-      }
-    });
+    document.addEventListener('keydown', function (ev) { onKey(ev, search); });
+    window.addEventListener('resize', function () { render(); });
 
     // refresca los "hace X min" sin esperar un snapshot
     setInterval(render, 30000);
+    loadToday();
+    setInterval(loadToday, 60000);
 
     if (FIXTURE) {
       fetch('fixture.json')

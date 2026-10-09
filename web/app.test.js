@@ -328,3 +328,115 @@ test('historyRows: share del total y total 0 sin dividir por cero', () => {
   assert.deepStrictEqual(A.historyRows([{ name: 'z', total: 0 }])[0].share, 0);
   assert.deepStrictEqual(A.historyRows(undefined), []);
 });
+
+// ---- PLAN-007: bandeja ----
+const bandeja = require('./app.js');
+
+const NOW = 1791476712278;
+const H = 3600000;
+const D = 24 * H;
+
+test('isAbandoned: umbral exacto de 24 h (más de, no desde)', () => {
+  const w = (t) => s('w', 'waiting', { lastActivityAt: t });
+  assert.strictEqual(bandeja.isAbandoned(w(NOW - D), NOW), false);
+  assert.strictEqual(bandeja.isAbandoned(w(NOW - D - 1), NOW), true);
+  assert.strictEqual(bandeja.isAbandoned(s('b', 'blocked', { lastActivityAt: NOW - D - 1 }), NOW), true);
+});
+
+test('isAbandoned: startedAt de respaldo, sin fechas no es abandonada, done/busy/idle nunca', () => {
+  assert.strictEqual(bandeja.isAbandoned(s('a', 'blocked', { lastActivityAt: null, startedAt: NOW - 90 * D }), NOW), true);
+  assert.strictEqual(bandeja.isAbandoned(s('a', 'waiting', { lastActivityAt: null, startedAt: NOW - H }), NOW), false);
+  assert.strictEqual(bandeja.isAbandoned(s('a', 'waiting', {}), NOW), false);
+  ['done', 'busy', 'idle'].forEach((st) => {
+    assert.strictEqual(bandeja.isAbandoned(s('x', st, { lastActivityAt: NOW - 90 * D }), NOW), false);
+  });
+  assert.strictEqual(bandeja.isAbandoned(null, NOW), false);
+});
+
+test('counts: las abandonadas no cuentan como esperándote; done no cuenta; desconocido = idle', () => {
+  const list = [
+    s('a', 'waiting', { lastActivityAt: NOW - H }),
+    s('b', 'blocked', { lastActivityAt: NOW - 2 * H }),
+    s('c', 'blocked', { startedAt: NOW - 90 * D }),
+    s('d', 'waiting', { lastActivityAt: NOW - 3 * D }),
+    s('e', 'busy', { lastActivityAt: NOW }),
+    s('f', 'idle', { lastActivityAt: NOW - 90 * D }),
+    s('g', 'done', {}),
+    s('h', 'raro', {}),
+  ];
+  assert.deepStrictEqual(bandeja.counts(list, NOW), { waiting: 2, busy: 1, idle: 2 });
+  assert.deepStrictEqual(bandeja.counts(null, NOW), { waiting: 0, busy: 0, idle: 0 });
+  // el favicon sale de este contador
+  assert.strictEqual(bandeja.faviconLabel(bandeja.counts(list, NOW).waiting), '2');
+});
+
+test('inboxItems: solo waiting/blocked vivas, la más reciente primero', () => {
+  const list = [
+    s('old', 'waiting', { lastActivityAt: NOW - 5 * H }),
+    s('ghost', 'blocked', { startedAt: NOW - 90 * D }),
+    s('new', 'blocked', { lastActivityAt: NOW - H }),
+    s('busy', 'busy', { lastActivityAt: NOW }),
+  ];
+  assert.deepStrictEqual(bandeja.inboxItems(list, NOW).map((x) => x.id), ['new', 'old']);
+  assert.deepStrictEqual(bandeja.inboxItems([], NOW), []);
+});
+
+test('splitAbandoned separa sin perder ninguna', () => {
+  const list = [s('a', 'waiting', { lastActivityAt: NOW }), s('b', 'waiting', { lastActivityAt: NOW - 2 * D })];
+  const r = bandeja.splitAbandoned(list, NOW);
+  assert.deepStrictEqual(r.live.map((x) => x.id), ['a']);
+  assert.deepStrictEqual(r.abandoned.map((x) => x.id), ['b']);
+});
+
+test('stepSelection: j/k en los bordes no dan la vuelta', () => {
+  const keys = ['a', 'b', 'c'];
+  assert.strictEqual(bandeja.stepSelection(keys, 'a', 1), 'b');
+  assert.strictEqual(bandeja.stepSelection(keys, 'c', 1), 'c');
+  assert.strictEqual(bandeja.stepSelection(keys, 'a', -1), 'a');
+  assert.strictEqual(bandeja.stepSelection(keys, 'c', -1), 'b');
+  assert.strictEqual(bandeja.stepSelection(keys, 'zzz', 1), 'a');
+  assert.strictEqual(bandeja.stepSelection(keys, '', -1), 'a');
+  assert.strictEqual(bandeja.stepSelection([], 'a', 1), null);
+});
+
+test('plainText: negritas, código, encabezado, link y espacios', () => {
+  assert.strictEqual(bandeja.plainText('**Listo**: __todo__ `ok`'), 'Listo: todo ok');
+  assert.strictEqual(bandeja.plainText('## Resumen\ntexto   con\n\nsaltos'), 'Resumen texto con saltos');
+  assert.strictEqual(bandeja.plainText('mirá [el PR](https://example.com/x) ya'), 'mirá el PR ya');
+  assert.strictEqual(bandeja.plainText('a # no es encabezado'), 'a # no es encabezado');
+  assert.strictEqual(bandeja.plainText(null), '');
+  assert.strictEqual(bandeja.plainText(undefined), '');
+  assert.strictEqual(bandeja.plainText(42), '42');
+});
+
+test('plainText: el texto hostil queda intacto como texto (no se interpreta ni se escapa)', () => {
+  const evil = '<img src=x onerror=alert(1)> <script>alert(2)</script>';
+  assert.strictEqual(bandeja.plainText(evil), evil);
+  assert.strictEqual(bandeja.plainText('**' + evil + '**'), evil);
+});
+
+test('oneLine colapsa comandos de varias líneas', () => {
+  assert.strictEqual(bandeja.oneLine('Bash: a \\\n  b\n\tc'), 'Bash: a \\ b c');
+  assert.strictEqual(bandeja.oneLine(null), '');
+});
+
+test('todayView: último día; oculto si no está listo o no hay días', () => {
+  const d = { ready: true, days: [{ output: 5, sessions: 1 }, { output: 2600000, sessions: 35 }] };
+  assert.deepStrictEqual(bandeja.todayView(d), { output: '2.6M', sessions: 35 });
+  assert.strictEqual(bandeja.todayView({ ready: false, days: d.days }), null);
+  assert.strictEqual(bandeja.todayView({ ready: true, days: [] }), null);
+  assert.strictEqual(bandeja.todayView(null), null);
+});
+
+test('franja y fixture: las dos abandonadas del fixture no cuentan ni entran a la franja', () => {
+  const fx = require('./fixture.json');
+  const now = fx.generatedAt;
+  const ab = fx.sessions.filter((x) => bandeja.isAbandoned(x, now));
+  assert.strictEqual(ab.length, 2);
+  assert.ok(ab.some((x) => x.status === 'blocked' && !x.lastActivityAt));
+  assert.ok(ab.some((x) => x.status === 'waiting' && x.kind === 'interactive'));
+  const inbox = bandeja.inboxItems(fx.sessions, now);
+  assert.ok(inbox.length > 0);
+  assert.ok(inbox.every((x) => !bandeja.isAbandoned(x, now)));
+  assert.ok(fx.sessions.length - ab.length >= 15, 'el fixture tiene al menos 15 filas vivas');
+});
