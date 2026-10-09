@@ -20,6 +20,8 @@ PLAN-003 suma, calculados en la misma pasada incremental del transcript que `tok
 |-------|--------|
 | `context` | `{current, compactions, lastCompactAt, lastPreTokens, warn}`. `current` = input + cache_read + cache_creation del ÚLTIMO mensaje del asistente (no la suma). `compactions` cuenta las líneas `compact_boundary`; `lastCompactAt`/`lastPreTokens` son `null` si nunca compactó. `warn` si `current >= -context-warn` (default `800000`, `0` lo desactiva). Es absoluto: el tamaño de ventana no está en ninguna fuente, por eso no hay porcentaje. `null` sin mensajes con usage. |
 | `rate` | `{windowMin: 5, output, calls, high}` con los tokens de salida y las llamadas (`message.id` únicos) de los últimos 5 min según los timestamps del transcript. `high` si `output > -rate-output` (default `20000`) o `calls > -rate-calls` (default `25`); `0` desactiva cada uno. `null` sin actividad en la ventana. Es "ritmo inusual", no "loop". |
+| `branch` | Rama de git de la sesión, leída de `HEAD` (en un worktree, el `HEAD` del worktree), sin ejecutar `git`. Desacoplado → primeros 7 del sha. `null` sin `.git` o con `HEAD` ilegible. |
+| `plan` | Avance del plan `{number, name, path, total, done, inProgress, blocked, pending, skipped, unknown}` contando el primer `**Estado:**` de cada `plans/PLAN-<N>-*/tasks/*.md`. `N` sale del key de orq y, si no, de la rama (`plan-?<N>`). Busca `plans/` desde la raíz del repo principal hacia arriba, sin pasar de `$HOME`. `null` sin número o sin plan. |
 
 PLAN-005 suma, de la misma lectura del transcript:
 

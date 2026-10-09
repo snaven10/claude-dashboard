@@ -5,11 +5,15 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"os"
+	"regexp"
+	"strconv"
 	"sync"
 	"time"
 
 	"claude-dashboard/internal/agents"
 	"claude-dashboard/internal/orq"
+	"claude-dashboard/internal/plans"
 	"claude-dashboard/internal/transcript"
 )
 
@@ -122,8 +126,43 @@ func (s *Server) enrich(ss *agents.Session, jobs map[string]orq.Job, now time.Ti
 			ss.Orq = o
 		}
 	}
+	ss.Branch = agents.Branch(ss.Cwd)
+	ss.Plan = findPlan(ss)
 	ss.Stale = s.StaleAfter > 0 && ss.Status == agents.StatusBusy && ss.LastActivityAt > 0 &&
 		now.UnixMilli()-ss.LastActivityAt > s.StaleAfter.Milliseconds()
+}
+
+var branchPlanRe = regexp.MustCompile(`(?i)plan-?(\d+)`)
+
+// planNumber: primero el key de orq (p<N>-task<M>), si no la rama (DD-23).
+func planNumber(ss *agents.Session) int {
+	if ss.Orq != nil && ss.Orq.Plan != nil {
+		if n, err := strconv.Atoi(*ss.Orq.Plan); err == nil && n > 0 {
+			return n
+		}
+	}
+	if ss.Branch != nil {
+		if m := branchPlanRe.FindStringSubmatch(*ss.Branch); m != nil {
+			if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+				return n
+			}
+		}
+	}
+	return 0
+}
+
+// findPlan devuelve el avance del plan de la sesión, o nil sin dato.
+func findPlan(ss *agents.Session) *agents.Plan {
+	n := planNumber(ss)
+	if n == 0 {
+		return nil
+	}
+	root := agents.RepoRoot(ss.Cwd)
+	home, err := os.UserHomeDir()
+	if root == "" || err != nil {
+		return nil
+	}
+	return (*agents.Plan)(plans.Find(n, root, home)) // mismos campos: conversión directa
 }
 
 // applyActivity pasa contexto y ritmo al contrato aplicando los umbrales (DD-13, DD-14).

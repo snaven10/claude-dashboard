@@ -647,3 +647,70 @@ func TestSessionsCarryAskAndErrors(t *testing.T) {
 		t.Error("ciclo sin cambios emitió")
 	}
 }
+
+// El poller tiene que pedir rama y plan (DD-23, DD-24); si enrich deja de
+// llamarlos, este test falla (mismo bug que tuvo Usage en PLAN-002).
+func TestSessionsCarryBranchAndPlan(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	repo := filepath.Join(home, "repo")
+	gitDir := filepath.Join(repo, ".git")
+	wtGit := filepath.Join(gitDir, "worktrees", "w")
+	wt := filepath.Join(home, "wt")
+	files := map[string]string{
+		filepath.Join(gitDir, "HEAD"):                                "ref: refs/heads/main\n",
+		filepath.Join(wtGit, "HEAD"):                                 "ref: refs/heads/feat-plan-5-task-012\n",
+		filepath.Join(wt, ".git"):                                    "gitdir: " + wtGit + "\n",
+		filepath.Join(repo, "plans", "PLAN-005-x", "tasks", "T1.md"): "- **Estado:** `done`\n",
+		filepath.Join(repo, "plans", "PLAN-005-x", "tasks", "T2.md"): "- **Estado:** `pending`\n",
+		filepath.Join(repo, "plans", "PLAN-009-y", "tasks", "T1.md"): "- **Estado:** `blocked`\n",
+	}
+	for p, c := range files {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(c), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	list := func(context.Context) ([]agents.Session, error) {
+		ss := fakeSessions(3)
+		ss[0].Cwd = wt // plan por la rama del worktree
+		ss[1].Cwd = wt // el key de orq gana sobre la rama
+		ss[1].Name = "w9"
+		ss[2].Cwd = "/work/demo" // sin .git → ni rama ni plan
+		return ss, nil
+	}
+	s := newTestServer(list)
+	s.Orq = func() (map[string]orq.Job, error) {
+		return map[string]orq.Job{"w9": {ID: "j", Key: "x-p9-task001"}}, nil
+	}
+	if _, err := s.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	s.mu.Lock()
+	got := append([]agents.Session(nil), s.sessions...)
+	s.mu.Unlock()
+
+	if got[0].Branch == nil || *got[0].Branch != "feat-plan-5-task-012" {
+		t.Errorf("branch[0] = %v", got[0].Branch)
+	}
+	if p := got[0].Plan; p == nil || p.Number != 5 || p.Total != 2 || p.Done != 1 || p.Pending != 1 {
+		t.Errorf("plan[0] = %+v", p)
+	}
+	if p := got[1].Plan; p == nil || p.Number != 9 || p.Blocked != 1 {
+		t.Errorf("plan[1] (orq key) = %+v", p)
+	}
+	if got[2].Branch != nil || got[2].Plan != nil {
+		t.Errorf("sin .git debía ser null: %v %+v", got[2].Branch, got[2].Plan)
+	}
+	// Contrato: las claves existen en el JSON (null cuando no hay dato).
+	body, _ := json.Marshal(got[2])
+	var m map[string]any
+	_ = json.Unmarshal(body, &m)
+	for _, k := range []string{"branch", "plan"} {
+		if v, ok := m[k]; !ok || v != nil {
+			t.Errorf("clave %q: ok=%v v=%v", k, ok, v)
+		}
+	}
+}

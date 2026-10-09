@@ -62,6 +62,8 @@ type Session struct {
 	Rate           *Rate       `json:"rate"`
 	Ask            *Ask        `json:"ask"`
 	Errors         *Errors     `json:"errors"`
+	Branch         *string     `json:"branch"`
+	Plan           *Plan       `json:"plan"`
 }
 
 // Ask es lo último que la sesión dejó abierto (DD-21): "question", "tool" o "text".
@@ -77,6 +79,21 @@ type Errors struct {
 	Count     int   `json:"count"`
 	LastAt    int64 `json:"lastAt"`
 	High      bool  `json:"high"`
+}
+
+// Plan es el avance del plan al que pertenece la sesión (DD-23). Mismos campos
+// que plans.Progress.
+type Plan struct {
+	Number     int    `json:"number"`
+	Name       string `json:"name"`
+	Path       string `json:"path"`
+	Total      int    `json:"total"`
+	Done       int    `json:"done"`
+	InProgress int    `json:"inProgress"`
+	Blocked    int    `json:"blocked"`
+	Pending    int    `json:"pending"`
+	Skipped    int    `json:"skipped"`
+	Unknown    int    `json:"unknown"`
 }
 
 // Context es el contexto actual y las compactaciones (DD-13). Sin porcentaje: el
