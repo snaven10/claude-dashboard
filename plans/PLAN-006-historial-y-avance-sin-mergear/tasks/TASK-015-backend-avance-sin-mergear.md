@@ -4,7 +4,7 @@
 - **Especialista:** claude-dashboard-worker
 - **Proyecto:** claude-dashboard (`~/personal/claude-dashboard`), rama `main`
 - **Depende de:** contrato §4 del master
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -35,4 +35,11 @@
 - [ ] `gofmt -l .` vacío, `go vet ./...`, `go test -race ./...` en verde y pegados en `Verificado por`.
 
 ## Resultado
-<!-- SE LLENA AL CERRAR (estado done/skipped). Vacío mientras esté pending. -->
+- **Estado:** done
+- **Commit:** `4307ada` (rama `feature/plan-6-task-015`)
+- **Archivos:** `internal/plans/plans.go`, `internal/plans/plans_test.go`, `internal/agents/agents.go` (campo `Unmerged`), `README.md`. `server_test.go` no hizo falta.
+- **Qué se hizo:** `worktreeRoots` lee `.git/worktrees/*/gitdir` (sin `git`; ignora vacíos, relativos y raíces inexistentes). `overlayState` elige la copia del worktree con estado distinto y `mtime` más nuevo (entre varios, la más nueva). `progress` aplica el overlay solo si el plan está en `<repoRoot>/plans/` (`inDir` pasa `repoRoot` solo cuando `dir == repoRoot`; plan en un padre → sin overlay). Tasks que solo existen en el worktree no suman. `Unmerged` agregado a `Progress` y `agents.Plan` (json `unmerged`).
+- **Criterios:** los 5 tests cubiertos y corridos (`TestUnmergedWorktreeWins`, `...OlderOrSameStateIgnored`, `...WorktreeOnlyTaskNotCounted`, `...DeletedWorktreeIgnored`, `...PlanInParentNoOverlay`) + `...NewestWorktreeWins`.
+- **Verificado por:** `gofmt -l .` vacío; `go vet ./...` limpio; `go test -race ./...` → ok en agents, orq, plans, server, transcript.
+- **Para el orquestador:** el frontend (TASK-016) lee `plan.unmerged`. No se tocó `server.go`/`main.go`.
+- **Gotcha:** el mtime de la copia del worktree se compara contra el de `main`; si el merge copia el archivo con mtime nuevo y mismo estado, `unmerged` vuelve a 0 solo (estado igual).
