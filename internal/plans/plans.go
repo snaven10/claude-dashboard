@@ -27,6 +27,7 @@ type Progress struct {
 	Pending    int    `json:"pending"`
 	Skipped    int    `json:"skipped"`
 	Unknown    int    `json:"unknown"`
+	Unmerged   int    `json:"unmerged"`
 }
 
 const (
@@ -114,7 +115,7 @@ func Find(number int, repoRoot, home string) *Progress {
 	home = filepath.Clean(home)
 	underHome := home != "" && home != "." && (dir == home || strings.HasPrefix(dir, home+string(filepath.Separator)))
 	for {
-		if p := inDir(number, dir); p != nil {
+		if p := inDir(number, dir, filepath.Clean(repoRoot)); p != nil {
 			return p
 		}
 		if !underHome || dir == home {
@@ -128,7 +129,7 @@ func Find(number int, repoRoot, home string) *Progress {
 	}
 }
 
-func inDir(number int, dir string) *Progress {
+func inDir(number int, dir, repoRoot string) *Progress {
 	entries, err := os.ReadDir(filepath.Join(dir, "plans"))
 	if err != nil {
 		return nil
@@ -144,17 +145,88 @@ func inDir(number int, dir string) *Progress {
 		if n, err := strconv.Atoi(m[1]); err != nil || n != number {
 			continue
 		}
-		return progress(number, filepath.Join(dir, "plans", e.Name()))
+		root := ""
+		if dir == repoRoot { // plan en un padre del repo (MI-EMPRESA): sin overlay
+			root = repoRoot
+		}
+		return progress(number, filepath.Join(dir, "plans", e.Name()), root)
 	}
 	return nil
 }
 
-func progress(number int, planPath string) *Progress {
+// worktreeRoots lista las raíces de los worktrees del repo leyendo
+// <repo>/.git/worktrees/*/gitdir (DD-28). Sin ejecutar git. Se ignoran los que
+// ya no existen (worktree borrado sin prune) y los gitdir ilegibles.
+func worktreeRoots(repoRoot string) []string {
+	gitdirs, _ := filepath.Glob(filepath.Join(repoRoot, ".git", "worktrees", "*", "gitdir"))
+	var roots []string
+	for _, g := range gitdirs {
+		data, err := os.ReadFile(g)
+		if err != nil || len(data) > 4096 {
+			continue
+		}
+		dotGit := strings.TrimSpace(string(data))
+		if dotGit == "" || !filepath.IsAbs(dotGit) {
+			continue
+		}
+		root := filepath.Dir(filepath.Clean(dotGit))
+		if st, err := os.Stat(root); err != nil || !st.IsDir() {
+			continue
+		}
+		roots = append(roots, root)
+	}
+	return roots
+}
+
+// overlayState devuelve el estado de la copia de la task en un worktree si
+// gana sobre main: existe, su estado difiere y su mtime es más nuevo. Con varios
+// worktrees gana el mtime más nuevo. ok=false si main se queda como está.
+func overlayState(mainFile, mainState string, rel string, roots []string) (string, bool) {
+	mst, err := os.Stat(mainFile)
+	if err != nil {
+		return "", false
+	}
+	best, bestTime, found := mainState, mst.ModTime(), false
+	for _, r := range roots {
+		wf := filepath.Join(r, rel)
+		st, err := os.Stat(wf)
+		if err != nil || st.IsDir() || !st.ModTime().After(bestTime) {
+			continue
+		}
+		s := taskState(wf)
+		if s == best {
+			continue
+		}
+		best, bestTime, found = s, st.ModTime(), true
+	}
+	return best, found
+}
+
+// progress cuenta las tasks del plan. Si repoRoot != "" y el plan está dentro
+// de <repoRoot>/plans/, aplica el overlay de worktrees sin mergear (DD-28).
+func progress(number int, planPath, repoRoot string) *Progress {
 	p := &Progress{Number: number, Name: filepath.Base(planPath), Path: planPath}
 	tasks, _ := filepath.Glob(filepath.Join(planPath, "tasks", "*.md"))
+	var roots []string
+	var relPlan string
+	if repoRoot != "" {
+		if rel, err := filepath.Rel(filepath.Join(repoRoot, "plans"), planPath); err == nil &&
+			rel != "." && !strings.HasPrefix(rel, "..") {
+			relPlan = filepath.Join("plans", rel)
+			roots = worktreeRoots(repoRoot)
+		}
+	}
 	for _, t := range tasks {
 		p.Total++
-		switch taskState(t) {
+		state := taskState(t)
+		if len(roots) > 0 {
+			rel := filepath.Join(relPlan, "tasks", filepath.Base(t))
+			if s, ok := overlayState(t, state, rel, roots); ok {
+				state = s
+				p.Unmerged++
+			}
+		}
+		switch state {
 		case stateDone:
 			p.Done++
 		case stateInProgress:
