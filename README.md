@@ -27,7 +27,7 @@ PLAN-005 suma, de la misma lectura del transcript:
 
 | Campo | Qué es |
 |-------|--------|
-| `ask` | `{kind, text, more}` con lo último que la sesión dejó abierto, en este orden: un `AskUserQuestion` sin respuesta (`kind:"question"`, `text` = la primera pregunta, `more` = preguntas restantes); una herramienta sin resultado (`kind:"tool"`, `"Bash: git push"`, o sea un permiso pedido si la sesión está `waiting`); el texto del último mensaje del asistente (`kind:"text"`). `null` si lo último es del usuario (Claude está trabajando). Una línea, 300 caracteres como máximo. |
+| `ask` | `{kind, text, more}` con lo último que la sesión dejó abierto, en este orden: un `AskUserQuestion` sin respuesta (`kind:"question"`, `text` = la primera pregunta, `more` = preguntas restantes); una herramienta sin resultado (`kind:"tool"`, `"Bash: git push"`, o sea un permiso pedido si la sesión está `waiting`); el último texto del asistente desde el último prompt real (`kind:"text"`), aunque después haya resultados de herramientas: un permiso pendiente NO queda en el transcript, así que en una `waiting` lo que se ve es lo último que Claude dijo. `null` si no hay texto del asistente desde el último prompt. Una línea, 300 caracteres como máximo. |
 | `errors` | `{windowMin: 10, count, lastAt, high}`: `tool_result` con `is_error` de los últimos 10 min. No cuentan los rechazos del usuario ni las interrupciones. `high` si `count >= -errors-warn` (default `5`, `0` lo desactiva). `null` sin errores en la ventana. Se calcula incrementalmente, sin releer el archivo. |
 
 `GET /api/sessions/{sessionId}/timeline` devuelve `{sessionId, events}` con los últimos 20 eventos

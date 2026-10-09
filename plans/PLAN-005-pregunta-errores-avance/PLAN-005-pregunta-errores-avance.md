@@ -1,7 +1,7 @@
 # PLAN-005 — Qué te pregunta, errores, avance del plan, rama y atajos
 
 **Fecha:** 2026-10-08
-**Fase:** Aprobado — en ejecución
+**Fase:** Cerrado
 **Proyectos:** claude-dashboard (`~/personal/claude-dashboard`)
 **Origen:** mejoras 1-6 propuestas tras cerrar PLAN-004; el usuario pidió "dale con todas"
 
@@ -35,9 +35,9 @@
 ## 3. Tasks y orden
 | Task | Qué | Especialista | Modelo | Depende de | Estado |
 |------|-----|--------------|--------|------------|--------|
-| **TASK-011** | Backend: `ask` y `errors` desde el transcript | claude-dashboard-worker | sonnet | contrato §4 | `pending` |
-| **TASK-012** | Backend: `branch` y `plan` (avance desde `plans/`) | claude-dashboard-worker | sonnet | contrato §4 | `pending` |
-| **TASK-013** | Frontend: pregunta, errores, avance, favicon, contadores, rama | claude-dashboard-worker | sonnet | contrato §4 (no código) | `pending` |
+| **TASK-011** | Backend: `ask` y `errors` desde el transcript | claude-dashboard-worker | sonnet | contrato §4 | `done` |
+| **TASK-012** | Backend: `branch` y `plan` (avance desde `plans/`) | claude-dashboard-worker | sonnet | contrato §4 | `done` |
+| **TASK-013** | Frontend: pregunta, errores, avance, favicon, contadores, rama | claude-dashboard-worker | sonnet | contrato §4 (no código) | `done` |
 
 ### Paralelismo
 
@@ -113,3 +113,15 @@ corta de texto imprimible (≤ 200) antes de mandarla.
 - Ejecutar `git` o leer el estado del árbol de trabajo (solo `HEAD`).
 
 ## 6. Cierre
+- **Cerrado:** 2026-10-08
+- **Shipeó:** rama `main` (sin remoto). Merge `06e02de` (rama de integración con TASK-011 `df460c8`, TASK-012 `a02f582`, TASK-013 `5b06602` y los arreglos de QA). Servicio reinstalado con `make install`.
+- **Verificación:**
+  - `gofmt`, `go vet`, `go test -race` (5 paquetes, incluido el nuevo `internal/plans`) y 29 tests de node en `main`; el código de `main` es idéntico a la rama de integración que pasó QA.
+  - Mutaciones: 9/10 (012) y 9/12 (011) detectadas por los tests de los workers; las 4 que sobrevivían (cache por tamaño, poda de errores, reset al truncar, pregunta truncada) ahora tienen test y fallan.
+  - Contra 35 sesiones reales, conteo independiente: `errors` 35/35, `branch` 35/35, `plan` 4/4, `ask` 34/35 (la que difiere es la sesión del orquestador, que cambió entre el snapshot y el recuento).
+  - Navegador con `?fixture`: pregunta/permiso/último mensaje según estado, insignia de errores, grupos con avance y barra, favicon con número, contador como filtro (persistido), rama; texto hostil inerte; sin scroll horizontal en claro 1280 y oscuro 360.
+  - **Bug que la QA atrapó:** un permiso pendiente NO queda en el transcript (la sesión `waiting` real terminaba en un `tool_result`) → la regla 3 de DD-21 daba `null` justo donde más importa. Corregido: el último texto desde el último prompt real.
+- **NO verificado:** la insignia de errores con una sesión real por encima del umbral (hoy el máximo real era 4); el favicon en el navegador de Windows; `ask` de una sesión background `blocked` (las 4 de hoy no tienen transcript).
+- **Límite conocido:** el avance de un plan de este repo se lee del repo principal; mientras un worker no mergea, su task cerrada en el worktree sigue contando como `pending`.
+- **Quedó afuera:** lo de §5. Sin tasks `skipped`.
+- **Continúa en:** —
