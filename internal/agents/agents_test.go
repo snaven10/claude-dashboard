@@ -178,3 +178,91 @@ func TestRemoteURLEnNormalize(t *testing.T) {
 		t.Errorf("sin bridge: %+v", s)
 	}
 }
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBranch(t *testing.T) {
+	sha := "0123456789abcdef0123456789abcdef01234567"
+	tmp := t.TempDir()
+
+	// repo normal
+	normal := filepath.Join(tmp, "normal")
+	writeFile(t, filepath.Join(normal, ".git", "HEAD"), "ref: refs/heads/feat/x-1\n")
+	// worktree: HEAD del worktree distinto del principal
+	main := filepath.Join(tmp, "main")
+	writeFile(t, filepath.Join(main, ".git", "HEAD"), "ref: refs/heads/main\n")
+	wtGit := filepath.Join(main, ".git", "worktrees", "w1")
+	writeFile(t, filepath.Join(wtGit, "HEAD"), "ref: refs/heads/plan-4-task-010\n")
+	wt := filepath.Join(tmp, "wt")
+	writeFile(t, filepath.Join(wt, ".git"), "gitdir: "+wtGit+"\n")
+	// desacoplado
+	det := filepath.Join(tmp, "det")
+	writeFile(t, filepath.Join(det, ".git", "HEAD"), sha+"\n")
+	// basura
+	junk := filepath.Join(tmp, "junk")
+	writeFile(t, filepath.Join(junk, ".git", "HEAD"), "\x00\x01 basura\n")
+	junk2 := filepath.Join(tmp, "junk2")
+	writeFile(t, filepath.Join(junk2, ".git", "HEAD"), "ref: refs/heads/"+strings.Repeat("a", 300)+"\n")
+	// sin .git
+	none := filepath.Join(tmp, "none")
+	if err := os.MkdirAll(none, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sub := filepath.Join(normal, "a", "b")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name, cwd string
+		want      string // "" = nil
+	}{
+		{"normal", normal, "feat/x-1"},
+		{"subdirectorio", sub, "feat/x-1"},
+		{"worktree", wt, "plan-4-task-010"},
+		{"principal", main, "main"},
+		{"desacoplado", det, sha[:7]},
+		{"basura", junk, ""},
+		{"demasiado larga", junk2, ""},
+		{"sin .git", none, ""},
+		{"cwd vacío", "", ""},
+	}
+	for _, c := range cases {
+		got := Branch(c.cwd)
+		if c.want == "" {
+			if got != nil {
+				t.Errorf("%s: esperaba nil, got %q", c.name, *got)
+			}
+			continue
+		}
+		if got == nil || *got != c.want {
+			t.Errorf("%s: got %v, want %q", c.name, got, c.want)
+		}
+	}
+	if got := RepoRoot(wt); got != main {
+		t.Errorf("RepoRoot(worktree) = %q, want %q", got, main)
+	}
+	if got := RepoRoot(none); got != "" {
+		t.Errorf("RepoRoot(sin .git) = %q", got)
+	}
+}
+
+func TestBranchFollowsHEADChanges(t *testing.T) {
+	d := filepath.Join(t.TempDir(), "r")
+	writeFile(t, filepath.Join(d, ".git", "HEAD"), "ref: refs/heads/a\n")
+	if b := Branch(d); b == nil || *b != "a" {
+		t.Fatalf("got %v", b)
+	}
+	writeFile(t, filepath.Join(d, ".git", "HEAD"), "ref: refs/heads/b\n")
+	if b := Branch(d); b == nil || *b != "b" {
+		t.Fatalf("no sigue el cambio de HEAD: %v", b)
+	}
+}

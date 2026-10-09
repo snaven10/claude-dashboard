@@ -60,6 +60,23 @@ type Session struct {
 	Tokens         *Tokens     `json:"tokens"`
 	Context        *Context    `json:"context"`
 	Rate           *Rate       `json:"rate"`
+	Branch         *string     `json:"branch"`
+	Plan           *Plan       `json:"plan"`
+}
+
+// Plan es el avance del plan al que pertenece la sesión (DD-23). Mismos campos
+// que plans.Progress.
+type Plan struct {
+	Number     int    `json:"number"`
+	Name       string `json:"name"`
+	Path       string `json:"path"`
+	Total      int    `json:"total"`
+	Done       int    `json:"done"`
+	InProgress int    `json:"inProgress"`
+	Blocked    int    `json:"blocked"`
+	Pending    int    `json:"pending"`
+	Skipped    int    `json:"skipped"`
+	Unknown    int    `json:"unknown"`
 }
 
 // Context es el contexto actual y las compactaciones (DD-13). Sin porcentaje: el
