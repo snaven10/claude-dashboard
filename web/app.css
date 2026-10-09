@@ -375,3 +375,9 @@ button.counter[aria-pressed="true"] { background: var(--idle-bg); border-color: 
 .hist-table th, .hist-table td { text-align: left; padding: 2px 4px; border-bottom: 1px solid var(--border); }
 .hist-table td.num, .hist-table th:not(:first-child) { text-align: right; }
 .hist-name { overflow-wrap: anywhere; }
+.hist-table th:first-child { width: 50%; }
+@media (max-width: 480px) {
+  /* angosto: el output ya está en la barra y en el resumen del día; el nombre necesita el lugar */
+  .hist-table th:nth-child(2), .hist-table td:nth-child(2) { display: none; }
+  .hist-table th:first-child { width: 58%; }
+}
