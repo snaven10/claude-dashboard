@@ -28,6 +28,13 @@ Este plan limpia el árbol, agrega licencia, reescribe el historial y publica.
 | **TASK-020** | Limpiar árbol: fixtures, tests, comentarios, planes, agente; `LICENSE` MIT; README de instalación | claude-dashboard-worker | sonnet | — | `pending` |
 | **TASK-021** | Reescribir historial y publicar (gate del usuario antes del push) | orquestador | — | TASK-020 | `pending` |
 
+### Paralelismo
+
+| Lote | Tasks | Condición |
+|------|-------|-----------|
+| 1 | **TASK-020** | Sin dependencias; en paralelo con PLAN-002 de orq (otro repo) |
+| 2 | **TASK-021** | Requiere TASK-020 mergeada y PLAN-002 TASK-011 de orq cerrada |
+
 TASK-020 puede correr en paralelo con PLAN-002 de orq (otro repo). TASK-021 comparte
 `reemplazos.txt` con PLAN-002 TASK-012 y se ejecutan juntas.
 
