@@ -80,13 +80,26 @@ con `web/vendor/qrcode.js`, qrcode-generator 1.4.4, MIT; nada sale de la máquin
 El panel sigue en `127.0.0.1`: se abre la SESIÓN en el teléfono, no el panel.
 
 ## Instalación
+**Requisitos:** Linux o WSL con systemd `--user`, Go (versión de `go.mod`) para compilar, y
+[Claude Code](https://claude.com/claude-code) instalado con `claude` en el `PATH` (el panel ejecuta
+`claude agents --json --all`). No hay otras dependencias: solo la stdlib de Go.
+
 ```
+git clone <url-del-repo> && cd claude-dashboard
 make install     # binario en ~/.local/bin + unidad systemd --user, enable --now
 make uninstall   # deja todo como estaba
 make test | make build
 ```
+Después abrí <http://localhost:7777>. Es **solo lectura** (no ejecuta acciones sobre tus sesiones, no
+escribe en `~/.claude/`) y **solo escucha en `127.0.0.1`**. Para probar la interfaz sin daemon:
+`web/index.html?fixture`.
+
 La unidad fija `PATH=%h/.local/bin:/usr/bin:/bin` porque el servicio necesita `claude` en PATH.
 Ver el estado: `systemctl --user status claude-dashboard`.
+
+**Nota sobre `plans/`:** los SHAs citados en los documentos de `plans/` son de antes de la
+publicación (el historial se reescribió) y ya no existen en este repo; sirven solo como referencia
+histórica.
 
 ## Seguridad
 Bindea siempre a `127.0.0.1` (el panel expone prompts). Un `-addr` no-loopback se rechaza

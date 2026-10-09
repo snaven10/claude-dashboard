@@ -49,7 +49,7 @@
     { "date": "2026-10-08", "input": 1200, "output": 1899605, "cacheRead": 9.1e8, "cacheCreation": 3.2e7,
       "messages": 4210, "sessions": 23,
       "byModel":   [{ "name": "claude-opus-5-5", "output": 1500000, "total": 7.0e8 }],
-      "byProject": [{ "name": "mi-empresa", "output": 1200000, "total": 5.0e8 }] }
+      "byProject": [{ "name": "demo-multi", "output": 1200000, "total": 5.0e8 }] }
   ]
 }
 ```
@@ -80,7 +80,7 @@ Log del tiempo del primer escaneo.
 principal (`<repo>/plans/…`), por cada worktree del repo (de `<repo>/.git/worktrees/*/gitdir`, sin
 ejecutar `git`) se mira `<worktree>/plans/<mismo plan>/tasks/<mismo archivo>`. Si existe, su estado
 es distinto al de `main` y su `mtime` es más nuevo → gana el del worktree y suma a `unmerged`. Tasks
-que solo existen en un worktree NO se agregan. Plan fuera del repo (MI-EMPRESA: `~/mi-empresa/plans`) → sin
+que solo existen en un worktree NO se agregan. Plan fuera del repo (el workspace multi-repo: `~/proyectos/mi-empresa/plans`) → sin
 cambios. Nunca se escribe nada.
 
 **DD-29 — Frontend.**

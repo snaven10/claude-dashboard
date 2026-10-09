@@ -12,7 +12,7 @@
 `internal/transcript.Summary(cwd, sessionID) (Detail, error)` devuelve `title`, `lastPrompt`, `lastAction`, `lastActivityAt` leyendo solo el final del archivo.
 
 ## Contexto verificado
-- Ruta: `~/.claude/projects/<slug>/<sessionId>.jsonl`, `slug` = `cwd` con `/` y `.` → `-` (ej. `/home/usuario/mi-empresa` → `-home-usuario-mi-empresa`). **No confiar ciegamente en el slug**: fallback `glob ~/.claude/projects/*/<sessionId>.jsonl`.
+- Ruta: `~/.claude/projects/<slug>/<sessionId>.jsonl`, `slug` = `cwd` con `/` y `.` → `-` (ej. `~/proyectos/mi-empresa` → `-home-user-proyectos-mi-empresa`). **No confiar ciegamente en el slug**: fallback `glob ~/.claude/projects/*/<sessionId>.jsonl`.
 - Tipos de línea vistos en la cola: `user`, `assistant`, `attachment`, `ai-title`, `last-prompt`, `mode`, `permission-mode`, `bridge-session`.
 - `user` puede ser un `tool_result` (no es un prompt real) → ignorarlo para `lastPrompt`.
 - `assistant.message.content[]` trae bloques `text` y `tool_use` (`name`, `input`).
@@ -25,7 +25,7 @@
 - [x] **Paso 2 — parsear tolerante**: línea que no parsea se salta.
 - [x] **Paso 3 — extraer** último `ai-title`, último prompt real, última acción (`tool_use` → `"<Tool>: <resumen input>"`, o primeros 200 chars del texto), timestamp más reciente.
 - [x] **Paso 4 — cache** por `(path, size, mtime)` con `sync.Mutex`.
-- [x] **Paso 5 — tests** con fixtures sintéticos (NO copiar transcripts reales: tienen datos de MI-EMPRESA).
+- [x] **Paso 5 — tests** con fixtures sintéticos (NO copiar transcripts reales: tienen datos de el workspace multi-repo).
 
 ## Criterios de aceptación
 - [x] Archivo de 50 MB se resume leyendo ≤ 2 MB (test con archivo generado).

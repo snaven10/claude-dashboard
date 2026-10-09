@@ -226,16 +226,16 @@ test('errorsView: insignia solo con high; sin high solo tooltip', () => {
 });
 
 test('groupByPlan: clave plan.path con fallback a orq.plan', () => {
-  const info = { number: 133, name: 'PLAN-042-x', path: '/p/PLAN-042-x', total: 28, done: 14, inProgress: 2, blocked: 4 };
+  const info = { number: 42, name: 'PLAN-042-x', path: '/p/PLAN-042-x', total: 28, done: 14, inProgress: 2, blocked: 4 };
   const list = [
-    s('a', 'busy', { plan: info, orq: { plan: '133' } }),
+    s('a', 'busy', { plan: info, orq: { plan: '42' } }),
     s('b', 'waiting', { plan: info }),
     s('c', 'busy', { orq: { plan: '2' } }),
     s('d', 'idle', { plan: { number: 7, path: '/p/PLAN-007-y', total: 1, done: 1 } }),
     s('e', 'idle'),
   ];
   const g = groupByPlan(list);
-  assert.deepStrictEqual(g.map((x) => x.plan), ['2', '7', '133', null]);
+  assert.deepStrictEqual(g.map((x) => x.plan), ['2', '7', '42', null]);
   assert.deepStrictEqual(g.map((x) => x.sessions.length), [1, 1, 2, 1]);
   assert.strictEqual(g[2].info, info);
   assert.strictEqual(g[0].info, null);
@@ -245,8 +245,8 @@ test('groupByPlan: clave plan.path con fallback a orq.plan', () => {
 });
 
 test('planHeading y planProgress', () => {
-  const g = { plan: '133', info: { total: 28, done: 14, blocked: 4, inProgress: 2 } };
-  assert.strictEqual(A.planHeading(g), 'PLAN-042 · 14/28 done · 4 blocked · 2 in_progress');
+  const g = { plan: '42', info: { total: 28, done: 14, blocked: 4, inProgress: 2 } };
+  assert.strictEqual(A.planHeading(g), 'PLAN-42 · 14/28 done · 4 blocked · 2 in_progress');
   assert.strictEqual(A.planHeading({ plan: '7', info: { total: 5, done: 5, blocked: 0, inProgress: 0 } }), 'PLAN-7 · 5/5 done');
   assert.strictEqual(A.planHeading({ plan: '2', info: null }), 'PLAN-2');
   assert.strictEqual(A.planHeading({ plan: null, info: null }), 'Sin plan');
@@ -278,7 +278,7 @@ test('filtro por estado: toggle y coincidencia (blocked cuenta como waiting)', (
 });
 
 test('matchesQuery encuentra por rama y por nombre del plan', () => {
-  const x = { name: 'n', branch: 'feat-plan-042-latido-front', plan: { name: 'PLAN-042-calidad' } };
+  const x = { name: 'n', branch: 'feat-plan-042-latido-front', plan: { name: 'PLAN-042-calidad-ejemplo' } };
   assert.strictEqual(A.matchesQuery(x, 'latido'), true);
   assert.strictEqual(A.matchesQuery(x, 'FEAT-PLAN'), true);
   assert.strictEqual(A.matchesQuery(x, 'calidad'), true);
@@ -294,7 +294,7 @@ test('fixture PLAN-005: cubre cada caso del contrato', () => {
   assert.ok(l.some((x) => x.errors && x.errors.high));
   assert.ok(l.some((x) => x.errors && x.errors.count > 0 && !x.errors.high));
   assert.ok(l.some((x) => x.plan && !x.orq));
-  assert.ok(l.filter((x) => x.plan && x.plan.number === 133).length >= 2);
+  assert.ok(l.filter((x) => x.plan && x.plan.number === 42).length >= 2);
   assert.ok(l.some((x) => x.branch && x.branch.length > 80));
   assert.ok(l.some((x) => x.branch && x.branch.startsWith('<')));
 });

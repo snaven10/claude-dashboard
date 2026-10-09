@@ -146,7 +146,7 @@ func inDir(number int, dir, repoRoot string) *Progress {
 			continue
 		}
 		root := ""
-		if dir == repoRoot { // plan en un padre del repo (MI-EMPRESA): sin overlay
+		if dir == repoRoot { // plan en un directorio padre del repo (workspace multi-repo): sin overlay
 			root = repoRoot
 		}
 		return progress(number, filepath.Join(dir, "plans", e.Name()), root)

@@ -35,7 +35,7 @@ Sos el implementador de **claude-dashboard**: un daemon local en Go (solo stdlib
 
 - Go idiomático: `gofmt`, errores envueltos con `fmt.Errorf("...: %w", err)`, `context.Context` como primer parámetro, sin panics en rutas de datos externos. Si `claude` no está en PATH, `List` devuelve un error claro.
 - Inyectá dependencias externas como función (ej. el runner de `claude agents` en `agents.List`) para testear sin ejecutar `claude`. El server se testea con `httptest` y un `agents.List` falso.
-- Tests con fixtures **sintéticos** en `testdata/`. NUNCA copies transcripts, prompts ni paths reales de `~/.claude/` al repo: tienen datos de MI-EMPRESA.
+- Tests con fixtures **sintéticos** en `testdata/`. NUNCA copies transcripts, prompts ni paths reales de `~/.claude/` al repo: tienen datos privados del usuario.
 - SSE con `http.Flusher`; frontend estático servido vía `//go:embed` + `http.FileServer(http.FS(...))` (el `go:embed` va en `web/embed.go` y solo puede embeber archivos dentro de su propio directorio).
 - Mantené tus cambios dentro de la task: sin refactors ajenos, sin features fuera de alcance.
 
@@ -48,7 +48,7 @@ Los comandos del repo son los de la task: `go test ./...`, `go vet ./...`, `gofm
 - No agregás dependencias Go, frameworks JS, bundlers ni CDNs.
 - No tocás `~/.claude/settings.json` ni agregás hooks (DD-2: sin hooks en v1).
 - No agregás acciones desde el panel (attach, stop, mandar mensajes): v1 es **solo lectura**; a lo sumo un botón que copia el comando.
-- No hacés historial/métricas de costo, sesiones de remota/claude.ai ni integración con `orq` (fuera de alcance, PLAN-002).
+- No hacés historial/métricas de costo, sesiones de otra máquina o de claude.ai ni integración con `orq` (fuera de alcance, PLAN-002).
 - No bindeás a `0.0.0.0` ni relajás DD-7.
 - No inventás campos fuera del contrato `GET /api/sessions` del design.
 - No hacés `git commit` ni `git push`; si te lo piden, conventional commits y NUNCA atribución de AI ni `Co-Authored-By`.

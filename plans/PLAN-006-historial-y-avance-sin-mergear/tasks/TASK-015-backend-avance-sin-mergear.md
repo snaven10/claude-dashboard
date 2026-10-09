@@ -15,7 +15,7 @@
 - Leé el master entero, sobre todo §2, §4 y DD-28.
 - `internal/plans/plans.go`: `Find(number, repoRoot, home)`, `inDir`, `progress`, `taskState` (cache por `mtime`+`size`). `Progress` y `agents.Plan` tienen los mismos campos (el poller convierte directo): agregá `Unmerged` a los DOS.
 - Un worktree se registra en `<repo>/.git/worktrees/<x>/gitdir`, cuyo contenido es la ruta absoluta al archivo `.git` del worktree (ej. `/home/u/.orq/trees/claude-dashboard/claude-dashboard/plan-5-task-011/.git`). La raíz del worktree es el directorio de esa ruta. Puede apuntar a algo que ya no existe (worktree borrado sin `prune`): ignoralo.
-- El plan "está dentro del repo" si su ruta empieza con `<repoRoot>/plans/`. En MI-EMPRESA el plan está en un padre del repo → no aplica.
+- El plan "está dentro del repo" si su ruta empieza con `<repoRoot>/plans/`. En el workspace multi-repo el plan está en un padre del repo → no aplica.
 - **Sin ejecutar `git`. Solo lectura. Fixtures sintéticos** en `t.TempDir()`.
 
 ## Archivos
@@ -31,7 +31,7 @@
 - [ ] Test: worktree con la copia MÁS VIEJA o con el mismo estado → no cambia, `unmerged=0`.
 - [ ] Test: task que solo existe en el worktree no suma al total.
 - [ ] Test: `gitdir` que apunta a un worktree borrado → ignorado sin error.
-- [ ] Test: plan en un padre del repo (layout MI-EMPRESA) → sin overlay.
+- [ ] Test: plan en un padre del repo (plan en un directorio padre del repo) → sin overlay.
 - [ ] `gofmt -l .` vacío, `go vet ./...`, `go test -race ./...` en verde y pegados en `Verificado por`.
 
 ## Resultado
