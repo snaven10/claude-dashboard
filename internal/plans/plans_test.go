@@ -297,3 +297,19 @@ func TestUnmergedPlanInParentNoOverlay(t *testing.T) {
 		t.Fatalf("got %+v", p)
 	}
 }
+
+// El más nuevo gana aunque el glob lo recorra PRIMERO (si no, ganaría el último por orden).
+func TestUnmergedNewestWorktreeWinsRegardlessOfOrder(t *testing.T) {
+	home := t.TempDir()
+	repo := filepath.Join(home, "r")
+	now := time.Now()
+	setTask(t, repo, "PLAN-005-x", "TASK-001-a.md", "pending", now.Add(-time.Hour))
+	w1 := addWorktree(t, repo, "w1", true) // w1 sale primero en el glob y es el más nuevo
+	w2 := addWorktree(t, repo, "w2", true)
+	setTask(t, w1, "PLAN-005-x", "TASK-001-a.md", "blocked", now)
+	setTask(t, w2, "PLAN-005-x", "TASK-001-a.md", "done", now.Add(-time.Minute))
+	p := Find(5, repo, home)
+	if p == nil || p.Blocked != 1 || p.Done != 0 || p.Unmerged != 1 {
+		t.Fatalf("got %+v", p)
+	}
+}

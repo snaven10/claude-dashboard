@@ -225,7 +225,10 @@ func (s *Scanner) scanFile(path, sid string) error {
 		st = &fileState{sessionID: sid, contrib: map[key]*counts{}}
 		s.files[path] = st
 	}
-	buf := make([]byte, chunkSize)
+	if size == st.offset { // sin bytes nuevos: ni buffer ni lectura (corre cada 60 s sobre ~1000 archivos)
+		return nil
+	}
+	buf := make([]byte, min(int64(chunkSize), size-st.offset))
 	var resto []byte
 	for pos := st.offset + int64(len(resto)); pos < size; {
 		n, err := f.ReadAt(buf[:min(int64(len(buf)), size-pos)], pos)

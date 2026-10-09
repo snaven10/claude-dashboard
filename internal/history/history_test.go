@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -227,5 +228,29 @@ func TestMissingRootIsNotFatal(t *testing.T) {
 	}
 	if r := s.Result(now); !r.Ready || len(r.Days) != 30 {
 		t.Fatalf("%+v", r)
+	}
+}
+
+// Un escaneo sin bytes nuevos no reserva el buffer de lectura: corre cada 60 s
+// sobre ~1000 transcripts y antes eran 4 MB por archivo por pasada.
+func TestUnchangedScanDoesNotAllocateBuffers(t *testing.T) {
+	root := t.TempDir()
+	for i := 0; i < 20; i++ {
+		write(t, filepath.Join(root, "slug", fmt.Sprintf("s%02d.jsonl", i)),
+			line("2026-10-08T12:00:00Z", fmt.Sprintf("m%d", i), "opus", "/w", 1, 2, 3, 4))
+	}
+	s := newScanner(root)
+	if err := s.Scan(); err != nil {
+		t.Fatal(err)
+	}
+	var a, b runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&a)
+	if err := s.Scan(); err != nil {
+		t.Fatal(err)
+	}
+	runtime.ReadMemStats(&b)
+	if got := b.TotalAlloc - a.TotalAlloc; got > 1<<20 {
+		t.Fatalf("2º escaneo sin cambios reservó %d bytes (quiero < 1 MB; 20 buffers de 4 MB = 80 MB)", got)
 	}
 }
