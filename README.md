@@ -34,6 +34,22 @@ ids presentes en el último snapshot (404 si no).
 
 Un único poller (cada 3 s, `-interval`) consulta F1; el snapshot se emite por SSE solo si cambió.
 
+## Abrir una sesión en el teléfono (PLAN-004)
+Las sesiones con Remote Control activo traen `remoteUrl` (`https://claude.ai/code/<bridgeSessionId>`;
+`null` si no hay bridge o el id no tiene el formato visto `session_…`, que no está documentado). En su
+tarjeta aparece **📱 abrir en el teléfono**: un panel con el QR (dibujado localmente en un `<canvas>`
+con `web/vendor/qrcode.js`, qrcode-generator 1.4.4, MIT; nada sale de la máquina), el link y "copiar link".
+
+- Interactiva sin link: la tarjeta indica escribir `/remote-control` (o `/rc`) en esa sesión; el QR
+  aparece solo en ~3 s.
+- Background sin link: no se dice nada (no está documentado que admitan Remote Control).
+- "Copiar comando" en una interactiva sin terminar avisa que `--resume` abre una segunda copia de la
+  conversación y, si hay link, sugiere el QR.
+- El setting `remoteControlAtStartup` de Claude Code activa Remote Control en toda sesión interactiva
+  nueva. Es decisión tuya; el panel solo lo menciona y no lo toca.
+
+El panel sigue en `127.0.0.1`: se abre la SESIÓN en el teléfono, no el panel.
+
 ## Instalación
 ```
 make install     # binario en ~/.local/bin + unidad systemd --user, enable --now

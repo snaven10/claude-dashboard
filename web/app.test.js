@@ -130,3 +130,64 @@ test('matchesQuery: campos, tildes, mayúsculas, orq y vacío', () => {
   assert.strictEqual(A.matchesQuery(sess, 'inexistente'), false);
   assert.strictEqual(A.matchesQuery({ name: 'x' }, 'y'), false);
 });
+
+const fs = require('node:fs');
+const qrcode = require('./vendor/qrcode.js');
+const BASE = 'https://claude.ai/' + 'code/';
+const ID = 'session_01PheFY7bAAutvpmHjzYFAFy';
+const RURL = BASE + ID;
+
+test('phoneMode: qué ve cada tipo de sesión (DD-20)', () => {
+  assert.strictEqual(A.phoneMode({ kind: 'interactive', remoteUrl: RURL }), 'qr');
+  assert.strictEqual(A.phoneMode({ kind: 'background', remoteUrl: RURL }), 'qr');
+  assert.strictEqual(A.phoneMode({ kind: 'interactive', remoteUrl: null }), 'enable');
+  assert.strictEqual(A.phoneMode({ kind: 'interactive' }), 'enable');
+  assert.strictEqual(A.phoneMode({ kind: 'background', remoteUrl: null }), 'none');
+  assert.strictEqual(A.phoneMode(null), 'none');
+});
+
+test('validRemoteUrl rechaza todo lo que no sea el link esperado', () => {
+  assert.strictEqual(A.validRemoteUrl(RURL), true);
+  assert.strictEqual(A.validRemoteUrl(RURL + '?x=1'), false);
+  assert.strictEqual(A.validRemoteUrl(RURL + '/'), false);
+  assert.strictEqual(A.validRemoteUrl('javascript:alert(1)'), false);
+  assert.strictEqual(A.validRemoteUrl(BASE.replace('https', 'http') + ID), false);
+  assert.strictEqual(A.validRemoteUrl(BASE.replace('claude.ai', 'evil.example') + ID), false);
+  assert.strictEqual(A.validRemoteUrl(RURL + '\n'), false);
+  assert.strictEqual(A.validRemoteUrl(null), false);
+});
+
+test('resumeWarning: solo interactivas no terminadas; sugiere el QR si hay link', () => {
+  assert.match(A.resumeWarning({ kind: 'interactive', status: 'busy' }), /segunda copia/);
+  assert.doesNotMatch(A.resumeWarning({ kind: 'interactive', status: 'busy' }), /QR/);
+  assert.match(A.resumeWarning({ kind: 'interactive', status: 'idle', remoteUrl: RURL }), /QR/);
+  assert.strictEqual(A.resumeWarning({ kind: 'interactive', status: 'done' }), '');
+  assert.strictEqual(A.resumeWarning({ kind: 'background', status: 'busy' }), '');
+});
+
+test('qrMatrix tiene el tamaño de getModuleCount() y es cuadrada', () => {
+  const qr = qrcode(0, 'M');
+  qr.addData(RURL);
+  qr.make();
+  const n = qr.getModuleCount();
+  const m = A.qrMatrix(RURL, qrcode);
+  assert.strictEqual(m.length, n);
+  assert.ok(m.every((row) => row.length === n));
+  assert.ok(m.some((row) => row.some(Boolean)));
+  // esquina superior izquierda: patrón de posición (oscuro)
+  assert.strictEqual(m[0][0], true);
+});
+
+test('fixture: una con link, una interactiva sin él, una background sin él', () => {
+  const d = JSON.parse(fs.readFileSync(__dirname + '/fixture.json', 'utf8'));
+  const modes = d.sessions.map((x) => A.phoneMode(x));
+  assert.ok(modes.includes('qr'));
+  assert.ok(modes.includes('enable'));
+  assert.ok(modes.includes('none'));
+  d.sessions.forEach((x) => assert.ok('remoteUrl' in x));
+});
+
+test('app.js no usa los generadores de HTML de la librería ni innerHTML', () => {
+  const src = fs.readFileSync(__dirname + '/app.js', 'utf8');
+  assert.doesNotMatch(src, /createSvgTag|createImgTag|createTableTag|innerHTML/);
+});

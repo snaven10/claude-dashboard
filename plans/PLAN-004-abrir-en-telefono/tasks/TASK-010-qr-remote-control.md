@@ -4,7 +4,7 @@
 - **Especialista:** claude-dashboard-worker
 - **Proyecto:** claude-dashboard (`~/personal/claude-dashboard`), rama `main`
 - **Depende de:** —
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -35,8 +35,7 @@ Cada sesión con Remote Control trae `remoteUrl` y la UI ofrece un QR para abrir
 - [ ] `gofmt`, `go vet`, `go test -race ./...`, `node --check web/app.js`, `node --test web/` en verde y pegados en `Verificado por`.
 
 ## Resultado
-<!-- SE LLENA AL CERRAR (estado done/skipped). Vacío mientras esté pending. -->
-- **Estado final:**
-- **Resumen:**
-- **Archivos tocados:**
-- **Verificado por:**
+- **Estado final:** done (criterio visual sin ejecutar, ver abajo)
+- **Resumen:** `Session.remoteUrl` (`*string`) sale de `bridgeSessionId` solo si cumple `^session_[A-Za-z0-9]{10,64}$` (DD-18); `remote` queda igual. Frontend: botón "📱 abrir en el teléfono" → panel con QR en `<canvas>` (fondo blanco fijo, margen de 4 módulos), link `target=_blank rel=noopener` y copiar link; interactiva sin link muestra `/remote-control` (`/rc`); background sin link no muestra nada; "copiar comando" en interactivas no terminadas avisa de la segunda copia y sugiere el QR. El cliente revalida la URL con regex antes de usarla en href/QR. Se usan solo `qrcode(0,'M')`, `addData`, `make`, `getModuleCount`, `isDark`. README documenta el flujo y menciona `remoteControlAtStartup`.
+- **Archivos tocados:** `internal/agents/agents.go`, `internal/agents/agents_test.go`, `web/embed.go`, `web/index.html`, `web/app.js`, `web/app.css`, `web/app.test.js`, `web/fixture.json`, `README.md`. Commit de código: `e9e8443`.
+- **Verificado por:** en el worktree: `gofmt -l .` (vacío), `go vet ./...` (ok), `go test -race ./...` (agents, orq, server, transcript: ok), `node --check web/app.js` (ok), `node --test web/` (21 pass, 0 fail). Cubren: `remoteUrl` válido/vacío/`/`/`?`/espacios/salto/corto/largo (Go); `phoneMode` por tipo de sesión, `validRemoteUrl`, `resumeWarning`, tamaño de la matriz == `getModuleCount()`, fixture con los 3 casos, y que `app.js` no contiene `createSvgTag`/`createImgTag`/`createTableTag`/`innerHTML` (JS). **NO verificado:** el criterio visual de `?fixture` (claro/oscuro, 1280 y 360 px, sin scroll horizontal): no abrí un navegador; el CSS usa `width:min(100%,320px)`, `overflow-wrap:anywhere` y fondo blanco fijo, pero falta mirarlo. Tampoco escaneé el QR con un teléfono.

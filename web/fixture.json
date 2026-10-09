@@ -14,6 +14,7 @@
       "startedAt": 1791476356334,
       "lastActivityAt": 1791476700000,
       "remote": true,
+      "remoteUrl": "https://claude.ai/code/session_01PheFY7bAAutvpmHjzYFAFy",
       "title": "Refactor del módulo de pagos",
       "lastPrompt": "Refactorizá el módulo de pagos para separar el cliente HTTP del dominio y agregá tests para los casos de error. Mantené la API pública sin cambios.",
       "lastAction": {
@@ -62,6 +63,7 @@
       "startedAt": 1791470000000,
       "lastActivityAt": 1791476600000,
       "remote": false,
+      "remoteUrl": null,
       "title": "Fix XSS en el render de comentarios",
       "lastPrompt": "<img src=x onerror=alert(1)> probá esto: <script>document.body.innerHTML=''</script>\nY después revisá el escape.",
       "lastAction": {
@@ -99,6 +101,7 @@
       "startedAt": 1791460000000,
       "lastActivityAt": 1791476000000,
       "remote": false,
+      "remoteUrl": null,
       "title": "Migración de esquema",
       "lastPrompt": "Corré la migración 0042 y verificá los índices.",
       "lastAction": {
@@ -130,6 +133,7 @@
       "startedAt": 1791400000000,
       "lastActivityAt": 1791470000000,
       "remote": false,
+      "remoteUrl": null,
       "title": "Actualizar README",
       "lastPrompt": "",
       "lastAction": {
@@ -155,6 +159,7 @@
       "startedAt": 1791300000000,
       "lastActivityAt": 1791310000000,
       "remote": false,
+      "remoteUrl": null,
       "title": "Lint masivo",
       "lastPrompt": "Corré el linter en todo el repo y arreglá lo automático.",
       "lastAction": {
@@ -192,6 +197,7 @@
       "startedAt": 1791470000000,
       "lastActivityAt": 1791475000000,
       "remote": false,
+      "remoteUrl": null,
       "stale": true,
       "title": "Build largo",
       "lastPrompt": "Compilá todo y corré la suite completa.",
@@ -240,6 +246,7 @@
       "startedAt": 1791468912278,
       "lastActivityAt": 1791469512278,
       "remote": false,
+      "remoteUrl": null,
       "stale": false,
       "title": "Migración reciente (done hace 2 h)",
       "lastPrompt": "Migrá el esquema a la v3.",
@@ -283,6 +290,7 @@
       "startedAt": 1791044712278,
       "lastActivityAt": null,
       "remote": false,
+      "remoteUrl": null,
       "stale": false,
       "title": "Terminada vieja sin lastActivityAt (usa startedAt)",
       "lastPrompt": "Generá el changelog.",

@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -50,6 +51,7 @@ type Session struct {
 	StartedAt      int64       `json:"startedAt"`
 	LastActivityAt int64       `json:"lastActivityAt"`
 	Remote         bool        `json:"remote"`
+	RemoteURL      *string     `json:"remoteUrl"`
 	Title          string      `json:"title"`
 	LastPrompt     string      `json:"lastPrompt"`
 	LastAction     *LastAction `json:"lastAction"`
@@ -95,6 +97,19 @@ type Tokens struct {
 	CacheRead     int64  `json:"cacheRead"`
 	CacheCreation int64  `json:"cacheCreation"`
 	Model         string `json:"model"`
+}
+
+// bridgeIDRe es el formato visto de bridgeSessionId (DD-18). No está documentado:
+// se valida estricto porque el valor termina en un href y en un QR.
+var bridgeIDRe = regexp.MustCompile(`^session_[A-Za-z0-9]{10,64}$`)
+
+// remoteURL devuelve el link de claude.ai para un bridgeSessionId válido; si no, nil.
+func remoteURL(bridgeID string) *string {
+	if !bridgeIDRe.MatchString(bridgeID) {
+		return nil
+	}
+	u := "https://claude.ai/code/" + bridgeID
+	return &u
 }
 
 // rawAgent es una entrada cruda de F1.
@@ -304,5 +319,6 @@ func normalize(r rawAgent, f2 rawSession) Session {
 		StartedAt:      r.StartedAt,
 		LastActivityAt: last,
 		Remote:         f2.BridgeSessionID != "",
+		RemoteURL:      remoteURL(f2.BridgeSessionID),
 	}
 }
