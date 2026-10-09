@@ -1,7 +1,7 @@
 # PLAN-006 — Historial de tokens por día y avance que cuenta lo no mergeado
 
 **Fecha:** 2026-10-08
-**Fase:** Aprobado — en ejecución
+**Fase:** Cerrado
 **Proyectos:** claude-dashboard (`~/personal/claude-dashboard`)
 **Origen:** mejoras opcionales que quedaron afuera de PLAN-005; el usuario pidió "dale con esas"
 
@@ -29,9 +29,9 @@
 ## 3. Tasks y orden
 | Task | Qué | Especialista | Modelo | Depende de | Estado |
 |------|-----|--------------|--------|------------|--------|
-| **TASK-014** | Backend: historial por día (`internal/history`, `GET /api/history`) | claude-dashboard-worker | sonnet | contrato §4 | `pending` |
-| **TASK-015** | Backend: avance del plan con worktrees sin mergear | claude-dashboard-worker | sonnet | contrato §4 | `pending` |
-| **TASK-016** | Frontend: vista de historial y "sin mergear" en el encabezado del plan | claude-dashboard-worker | sonnet | contrato §4 (no código) | `pending` |
+| **TASK-014** | Backend: historial por día (`internal/history`, `GET /api/history`) | claude-dashboard-worker | sonnet | contrato §4 | `done` |
+| **TASK-015** | Backend: avance del plan con worktrees sin mergear | claude-dashboard-worker | sonnet | contrato §4 | `done` |
+| **TASK-016** | Frontend: vista de historial y "sin mergear" en el encabezado del plan | claude-dashboard-worker | sonnet | contrato §4 (no código) | `done` |
 
 ### Paralelismo
 
@@ -96,3 +96,15 @@ cambios. Nunca se escribe nada.
 - Historial más allá de lo que Claude Code conserva en disco; costo en dólares (DD-11).
 
 ## 6. Cierre
+- **Cerrado:** 2026-10-08
+- **Shipeó:** rama `main` (sin remoto). Merge `54daddf` (integración de TASK-014 `44d36d7`, TASK-015 `4307ada`, TASK-016 `1e81974` y arreglos de QA). Servicio reinstalado con `make install`.
+- **Verificación:**
+  - `gofmt`, `go vet`, `go test -race` (6 paquetes, incluido el nuevo `internal/history`) y 33 tests de node en `main`; el código de `main` es idéntico a la rama de integración que pasó QA.
+  - Mutaciones (descartando las que no compilan): 014 10/10; 015 3/6, de las sobrevivientes 2 son equivalentes (doble resguardo) y 1 era un hueco real (orden del glob) → test nuevo.
+  - Historial contra los transcripts reales, recuento independiente en Python: **29/30 días exactos** (input, output, caches, mensajes, sesiones) y las filas por modelo/proyecto suman el total; hoy difiere en 3 de 4.606 mensajes por sesiones vivas escribiendo entre el escaneo y el recuento. Primer escaneo: **5,2-5,5 s para 1,58 GB, 24 MB de RSS**.
+  - `unmerged` con un caso real: los 3 worktrees de este plan con las tasks cerradas y `main` en `pending` → `3/3 done`, `unmerged 3`.
+  - Navegador: panel de historial con datos reales en claro 1280 y oscuro 360, sin scroll horizontal; fixture con proyecto hostil inerte; `(2 sin mergear)` en el encabezado.
+  - **Bugs que la QA atrapó:** `scanFile` reservaba un buffer de 4 MB por archivo en CADA pasada aunque no hubiera bytes nuevos (~4 GB/min de basura con 991 archivos) → sale antes y dimensiona el buffer, con test de memoria que falla con el código viejo. Tablas del historial ilegibles a 360 px (nombres partidos) → columna output oculta en angosto.
+- **NO verificado:** el cambio de día a medianoche con el server corriendo; el historial después de que la limpieza automática borre transcripts viejos.
+- **Quedó afuera:** lo de §5. Sin tasks `skipped`.
+- **Continúa en:** —
