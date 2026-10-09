@@ -80,6 +80,7 @@ func run() error {
 		Activity:    transcript.Activity,
 		Timeline:    transcript.Timeline,
 		Errors:      transcript.Errors,
+		Extras:      transcript.ExtrasFor,
 		ErrorsWarn:  *errorsWarn,
 		ContextWarn: *ctxWarn,
 		RateOutput:  *rateOutput,

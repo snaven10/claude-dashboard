@@ -38,7 +38,7 @@ func (s *Server) build(ctx context.Context) ([]agents.Session, error) {
 	}
 	jobs := s.loadOrq()
 	now := s.now()
-	if s.Summary == nil && s.Usage == nil && s.Activity == nil && s.Errors == nil {
+	if s.Summary == nil && s.Usage == nil && s.Activity == nil && s.Errors == nil && s.Extras == nil {
 		for i := range sessions {
 			s.enrich(&sessions[i], jobs, now)
 		}
@@ -86,6 +86,14 @@ func (s *Server) build(ctx context.Context) ([]agents.Session, error) {
 					}
 				}
 			}
+			// PRs, artifacts, líneas, permisos y subagentes (DD-35): misma pasada incremental.
+			if s.Extras != nil {
+				if e, err := s.Extras(ss.Cwd, ss.SessionID, now); err != nil {
+					s.logf("extras %s: %v", ss.SessionID, err)
+				} else {
+					applyExtras(ss, e)
+				}
+			}
 		}(&sessions[i])
 	}
 	wg.Wait()
@@ -117,6 +125,13 @@ func (s *Server) loadOrq() map[string]orq.Job {
 // enrich completa orq y stale (DD-8, DD-10). Stale depende de lastActivityAt
 // y no de un contador: el hash solo cambia cuando el valor cambia.
 func (s *Server) enrich(ss *agents.Session, jobs map[string]orq.Job, now time.Time) {
+	// Las listas del contrato son [] y no null cuando no hay dato (DD-35).
+	if ss.PRs == nil {
+		ss.PRs = []agents.PR{}
+	}
+	if ss.Artifacts == nil {
+		ss.Artifacts = []agents.Artifact{}
+	}
 	if ss.Name != "" {
 		if j, ok := jobs[ss.Name]; ok {
 			o := &agents.Orq{Job: j.ID, Specialist: j.Specialist, WS: j.WS}
@@ -183,8 +198,40 @@ func (s *Server) applyActivity(ss *agents.Session, c *transcript.Context, r *tra
 	}
 }
 
+// applyExtras pasa los extras de DD-35 al contrato. Nunca copia costo. Las
+// listas quedan [] sin dato. Subagents.active cambia con el tiempo, pero el
+// hash solo se mueve cuando cambia el número (no hay contadores de tiempo).
+func applyExtras(ss *agents.Session, e *transcript.Extras) {
+	if e == nil {
+		return
+	}
+	for _, p := range e.PRs {
+		ss.PRs = append(ss.PRs, agents.PR{Number: p.Number, URL: p.URL, Repo: p.Repo})
+	}
+	for _, a := range e.Artifacts {
+		ss.Artifacts = append(ss.Artifacts, agents.Artifact{Title: a.Title, URL: a.URL})
+	}
+	if e.Lines != nil {
+		ss.Lines = &agents.Lines{Added: e.Lines.Added, Removed: e.Lines.Removed}
+	}
+	if e.PermissionMode != "" {
+		m := e.PermissionMode
+		ss.PermissionMode = &m
+	}
+	if e.Subagents != nil {
+		ss.Subagents = &agents.Subagents{Active: e.Subagents.Active, Total: e.Subagents.Total}
+	}
+}
+
 func applyDetail(ss *agents.Session, d transcript.Detail) {
 	ss.Title = d.Title
+	if d.Away != nil {
+		ss.Away = &agents.Away{Text: d.Away.Text, At: d.Away.At}
+	}
+	if d.TurnStartedAt > 0 {
+		t := d.TurnStartedAt
+		ss.TurnStartedAt = &t
+	}
 	ss.LastPrompt = d.LastPrompt
 	if d.Ask != nil {
 		ss.Ask = &agents.Ask{Kind: d.Ask.Kind, Text: d.Ask.Text, More: d.Ask.More}

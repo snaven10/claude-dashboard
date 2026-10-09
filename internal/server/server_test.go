@@ -763,3 +763,93 @@ func TestSessionsCarryBranchAndPlan(t *testing.T) {
 		}
 	}
 }
+
+// El poller tiene que pedir los 7 campos de DD-35 (away y turnStartedAt vía
+// Summary; el resto vía Extras). Si deja de pedirlos, este test falla.
+func TestSessionsCarryDatosDeSesion(t *testing.T) {
+	s := newTestServer(func(context.Context) ([]agents.Session, error) { return fakeSessions(3), nil })
+	s.Summary = func(cwd, id string) (transcript.Detail, error) {
+		if strings.HasSuffix(id, "0") {
+			return transcript.Detail{Title: "T", Away: &transcript.Away{Text: "Terminé la migración", At: 2000}, TurnStartedAt: 1000}, nil
+		}
+		return transcript.Detail{Title: "T"}, nil
+	}
+	active := 2
+	var calls atomic.Int32
+	s.Extras = func(cwd, id string, now time.Time) (*transcript.Extras, error) {
+		calls.Add(1)
+		switch {
+		case strings.HasSuffix(id, "0"):
+			return &transcript.Extras{
+				PRs:            []transcript.PR{{Number: 87, URL: "https://git.ejemplo/g/r/-/merge_requests/87", Repo: "g/r"}},
+				Artifacts:      []transcript.Artifact{{Title: "Plan", URL: "https://claude.ai/artifact/abc"}},
+				Lines:          &transcript.Lines{Added: 412, Removed: 96},
+				PermissionMode: "auto",
+				Subagents:      &transcript.SubagentStats{Active: active, Total: 7},
+			}, nil
+		case strings.HasSuffix(id, "1"):
+			return nil, errors.New("roto") // no tumba la sesión
+		}
+		return &transcript.Extras{}, nil
+	}
+	if _, err := s.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	s.mu.Lock()
+	got := append([]agents.Session(nil), s.sessions...)
+	body := append([]byte(nil), s.current...)
+	s.mu.Unlock()
+	if calls.Load() != 3 {
+		t.Fatalf("Extras se llamó %d veces, quiero 3", calls.Load())
+	}
+	g := got[0]
+	if g.Away == nil || g.Away.Text != "Terminé la migración" || g.Away.At != 2000 {
+		t.Errorf("away=%+v", g.Away)
+	}
+	if g.TurnStartedAt == nil || *g.TurnStartedAt != 1000 {
+		t.Errorf("turnStartedAt=%v", g.TurnStartedAt)
+	}
+	if len(g.PRs) != 1 || g.PRs[0].Number != 87 || g.PRs[0].Repo != "g/r" {
+		t.Errorf("prs=%+v", g.PRs)
+	}
+	if len(g.Artifacts) != 1 || g.Artifacts[0].URL != "https://claude.ai/artifact/abc" {
+		t.Errorf("artifacts=%+v", g.Artifacts)
+	}
+	if g.Lines == nil || g.Lines.Added != 412 || g.Lines.Removed != 96 {
+		t.Errorf("lines=%+v", g.Lines)
+	}
+	if g.PermissionMode == nil || *g.PermissionMode != "auto" {
+		t.Errorf("permissionMode=%v", g.PermissionMode)
+	}
+	if g.Subagents == nil || g.Subagents.Active != 2 || g.Subagents.Total != 7 {
+		t.Errorf("subagents=%+v", g.Subagents)
+	}
+	// sin dato: null en lo escalar y [] en las listas; el costo no existe en el JSON
+	var snap struct {
+		Sessions []map[string]json.RawMessage `json:"sessions"`
+	}
+	if err := json.Unmarshal(body, &snap); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"away", "lines", "permissionMode", "subagents", "turnStartedAt"} {
+		if v, ok := snap.Sessions[2][k]; !ok || string(v) != "null" {
+			t.Errorf("sin dato %q debe ser null, es %s (presente=%v)", k, v, ok)
+		}
+	}
+	for _, k := range []string{"prs", "artifacts"} {
+		if string(snap.Sessions[1][k]) != "[]" || string(snap.Sessions[2][k]) != "[]" {
+			t.Errorf("sin dato %q debe ser []: %s / %s", k, snap.Sessions[1][k], snap.Sessions[2][k])
+		}
+	}
+	if low := strings.ToLower(string(body)); strings.Contains(low, "totalcostusd") || strings.Contains(low, `"cost`) {
+		t.Errorf("el snapshot no puede traer costo: %s", body)
+	}
+	// subagents.active cambia con el tiempo pero el número no: no emite
+	if changed, _ := s.Refresh(context.Background()); changed {
+		t.Error("ciclo con el mismo número de subagentes activos emitió")
+	}
+	active = 1
+	if changed, _ := s.Refresh(context.Background()); !changed {
+		t.Error("cambió el número de activos y no emitió")
+	}
+}

@@ -51,7 +51,18 @@ type Detail struct {
 	LastAction     *Action `json:"lastAction"`
 	LastActivityAt int64   `json:"lastActivityAt"` // ms epoch; 0 si no hay
 	Ask            *Ask    `json:"ask"`            // nil si Claude está trabajando
+	// PLAN-008 (DD-35)
+	Away          *Away `json:"away"`          // resumen "mientras no estabas"; nil si no aplica
+	TurnStartedAt int64 `json:"turnStartedAt"` // ms del último prompt real; 0 si no hay
 }
+
+// Away es el resumen que Claude escribe al volver el usuario.
+type Away struct {
+	Text string `json:"text"`
+	At   int64  `json:"at"`
+}
+
+const maxAway = 400
 
 // Root es el directorio de proyectos. Vacío = ~/.claude/projects.
 // Se expone para tests.
@@ -209,7 +220,10 @@ type line struct {
 	AITitle    string `json:"aiTitle"`
 	LastPrompt string `json:"lastPrompt"`
 	IsMeta     bool   `json:"isMeta"`
-	Message    struct {
+	Subtype    string `json:"subtype"`
+	// Content se decodifica solo para away_summary: en otros tipos puede no ser string.
+	Content json.RawMessage `json:"content"`
+	Message struct {
 		Content json.RawMessage `json:"content"`
 	} `json:"message"`
 }
@@ -319,6 +333,7 @@ func parse(data []byte) (Detail, bool) {
 	var action *Action
 	var realUser bool
 	var ask askScan
+	var away *Away // el más nuevo de la ventana; se valida contra el último prompt al final
 
 	lines := bytes.Split(data, []byte{'\n'})
 	for i := len(lines) - 1; i >= 0; i-- { // de atrás hacia adelante: lo último gana
@@ -352,6 +367,7 @@ func parse(data []byte) (Detail, bool) {
 			if !realUser {
 				if text, ok := realUserText(l.Message.Content); ok {
 					d.LastPrompt = truncate(text, maxPrompt)
+					d.TurnStartedAt = parseTime(l.Timestamp)
 					realUser = true
 					ask.done = true
 				}
@@ -363,7 +379,21 @@ func parse(data []byte) (Detail, bool) {
 			if !ask.done {
 				ask.assistant(l.Message.Content)
 			}
+		case "system":
+			if l.Subtype == "away_summary" && away == nil {
+				var s string
+				if json.Unmarshal(l.Content, &s) == nil {
+					if t := oneLine(s); t != "" {
+						away = &Away{Text: truncate(t, maxAway), At: parseTime(l.Timestamp)}
+					}
+				}
+			}
 		}
+	}
+	// Solo cuenta si es posterior al último prompt real; sin prompt real en la
+	// ventana no se puede saber, así que no se muestra.
+	if away != nil && realUser && away.At > 0 && away.At > d.TurnStartedAt {
+		d.Away = away
 	}
 	d.Ask = ask.result()
 	if !realUser && fallbackPrompt != "" {

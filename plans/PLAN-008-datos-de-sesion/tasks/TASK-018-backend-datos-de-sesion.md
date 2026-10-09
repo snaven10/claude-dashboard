@@ -4,7 +4,7 @@
 - **Especialista:** claude-dashboard-worker
 - **Proyecto:** claude-dashboard (`~/personal/claude-dashboard`), rama `main`
 - **Depende de:** contrato §4 del master
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -45,4 +45,13 @@ Cada sesión trae `away`, `prs`, `artifacts`, `lines`, `permissionMode`, `subage
 - [ ] `gofmt -l .` vacío, `go vet ./...`, `go test -race ./...` en verde y pegados en `Verificado por`.
 
 ## Resultado
-<!-- SE LLENA AL CERRAR (estado done/skipped). Vacío mientras esté pending. -->
+- **Estado:** done
+- **Commit:** d7b042d (rama `feature/plan-8-task-018`)
+- **Archivos creados:** `internal/transcript/extras.go`, `internal/transcript/subagents.go`, `internal/transcript/subagents_test.go`
+- **Archivos modificados:** `internal/transcript/transcript.go`, `transcript_test.go`, `usage.go`, `usage_test.go`, `internal/agents/agents.go`, `internal/server/poller.go`, `server.go`, `server_test.go`, `README.md`, `cmd/claude-dashboard/main.go` (ver desvío)
+- **Qué hace:** `Detail.Away`/`TurnStartedAt` en `parse` (cola); `prs`/`artifacts`/`lines`/`permissionMode` en el acumulador incremental con filtro `bytes.Contains` previo a cualquier `Unmarshal` (`extraKind`); `ExtrasFor` (misma pasada que Usage/Errors) + `Subagents(dir, now)`; el poller los vuelca en `Session` (listas `[]` sin dato, escalares `null`). `extraLine` no declara `totalCostUSD`, así que el costo no puede salir.
+- **Desvío:** se tocó `cmd/claude-dashboard/main.go` (1 línea: `Extras: transcript.ExtrasFor`), que no estaba en la lista de la task; sin eso el daemon real no pide los campos.
+- **Decisiones menores:** `permissionMode` raro como último valor da `null` (no arrastra el anterior); `away` sin prompt real en la ventana de lectura no se muestra.
+- **Criterios:** todos cubiertos por tests corridos (away, prs, artifacts, lines sin costo, permissionMode, subagents 119 s/121 s/sin dir, incremental 0 bytes, server con los campos y sin emitir si `active` no cambia).
+- **Verificado por:** `gofmt -l .` → vacío; `go vet ./...` → sin salida; `go test -race ./...` → ok en agents, history, orq, plans, server, transcript.
+- **No verificado:** contra transcripts reales (solo fixtures sintéticos); rendimiento sobre 1,6 GB al arrancar.
