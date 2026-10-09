@@ -34,6 +34,16 @@ PLAN-005 suma, de la misma lectura del transcript:
 (`prompt` | `tool` | `text`, del más viejo al más nuevo), leídos de la cola del transcript. Solo acepta
 ids presentes en el último snapshot (404 si no).
 
+`GET /api/history` (PLAN-006) devuelve `{generatedAt, ready, days}`: los últimos 30 días **locales**
+terminando hoy (ascendente, con los días en cero), cada uno con `input`, `output`, `cacheRead`,
+`cacheCreation`, `messages`, `sessions` y los desgloses `byModel` / `byProject` (top 5 por `total`
+más una fila `"otros"`). Se calcula de `~/.claude/projects/**/*.jsonl` — incluye los transcripts de
+subagentes, que suman al día y a la sesión padre — con un escáner propio (primer escaneo en segundo
+plano y después cada `-history-interval`, default `60s`, `0` lo desactiva), incremental por archivo y
+sin escribir nada. La request nunca escanea: devuelve el último resultado; `ready:false` y `days: []`
+hasta que termina el primer escaneo. Un transcript borrado deja de contar. Los tokens por sesión de las
+tarjetas siguen sin incluir subagentes.
+
 ## De dónde saca los datos
 | Fuente | Uso | Estabilidad |
 |--------|-----|-------------|
