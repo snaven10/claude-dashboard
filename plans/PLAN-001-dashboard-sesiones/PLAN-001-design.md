@@ -44,7 +44,7 @@ que se repintan con cada evento SSE. Angular/React acá es usar una grúa para c
     "id": "971b887d", "sessionId": "971b887d-…", "pid": 1816810,
     "kind": "interactive",
     "name": "demo-5c",
-    "cwd": "/home/usuario/mi-empresa", "project": "mi-empresa",
+    "cwd": "~/proyectos/mi-empresa", "project": "mi-empresa",
     "status": "busy",               // busy | waiting | idle | blocked | done
     "waitingFor": null,
     "startedAt": 1791476356334, "lastActivityAt": 1791476712278,

@@ -13,12 +13,12 @@ Repo público en GitHub cuyo historial completo no contiene nada del cliente ni 
 
 ## Decisiones del usuario
 - Licencia: **MIT** (confirmado 2026-10-09).
-- Correo de autor: **pendiente** (propio vs `noreply` de GitHub).
+- Correo de autor: **el propio** (`funes@samuelfunes.com`, confirmado 2026-10-09). Sin `--mailmap`.
 
 ## Pasos
 - [ ] **Paso 1** — respaldo `git clone --mirror` a `~/respaldos/claude-dashboard-pre-publicacion.git`.
 - [ ] **Paso 2** — `filter-repo --replace-text reemplazos.txt --replace-message reemplazos.txt`
-  (+ `--mailmap` si aplica) en un clone fresco, con la lista compartida con orq.
+  en un clone fresco, con la lista compartida con orq.
 - [ ] **Paso 3** — `git log --all -p | rg -i <patrón completo>` vacío; `go test ./...` y tests de
   node en el HEAD reescrito.
 - [ ] **Paso 4 — GATE.** Mostrar al usuario reemplazos, conteos y resultado. **Sin su OK no se pushea.**

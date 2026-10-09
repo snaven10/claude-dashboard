@@ -4,7 +4,7 @@
 **Fase:** Cerrado
 **Diseño:** [`PLAN-002-design.md`](./PLAN-002-design.md)
 **Proyectos:** claude-dashboard (`~/personal/claude-dashboard`)
-**Origen:** pedido del usuario tras cerrar PLAN-001 — features 1 a 5 de la propuesta (remota descartado: hoy no se usa)
+**Origen:** pedido del usuario tras cerrar PLAN-001 — features 1 a 5 de la propuesta (otra máquina descartada: hoy no se usa)
 
 ## 1. Qué resuelve
 El panel de PLAN-001 muestra el estado, pero solo si lo estás mirando, no distingue una sesión
@@ -42,7 +42,7 @@ trabajando de una colgada, no sabe qué worker de `orq` es cuál y no dice cuán
 | 1 | **TASK-006**, **TASK-007** | Archivos disjuntos (`internal/`+`cmd/` vs `web/`); los une el contrato del design, como TASK-001/004 en PLAN-001 |
 
 ## 4. Fuera de alcance
-- Sesiones de remota (no se usa hoy).
+- Sesiones de otra máquina (no se usa hoy).
 - Acciones desde el panel (stop, mensajes): sigue siendo solo lectura.
 - Costo en dólares (DD-11).
 - Persistir históricos de tokens entre reinicios del servicio.

@@ -23,12 +23,12 @@
   transcripts: 1.144 errores; 10 son rechazos del usuario ("The user doesn't want to proceed…") y 1
   interrupción → esos NO cuentan. En ventanas de 10 min con al menos un error: p50 1 · p90 2 ·
   p95 3 · **p99 6** · máx 12 → umbral por defecto **5 en 10 min** (DD-22).
-- **`Estado:` de las tasks:** 501 líneas en MI-EMPRESA + este repo. 85 % es `` `pending` ``/`` `done` ``
+- **`Estado:` de las tasks:** 501 líneas en el workspace multi-repo + este repo. 85 % es `` `pending` ``/`` `done` ``
   con backticks; hay variantes sin backticks, en español (`Pendiente`, `PENDIENTE`), con emoji
   (`🟢 \`pending\``) y con texto después (`` `done` — cerrada… ``) → parser tolerante (DD-23).
 - **Dónde está el plan de un worker:** los jobs de orq de este repo traen `p<N>-task<M>` en el key;
-  los de MI-EMPRESA son `worker@<repo>` y el plan está en la RAMA (`feat-plan-042-…`). Los planes viven en
-  `<raíz>/plans/PLAN-<N>-<slug>/` donde la raíz es el repo (este) o un padre (MI-EMPRESA: `~/mi-empresa/plans`).
+  los de el workspace multi-repo son `worker@<repo>` y el plan está en la RAMA (`feat-plan-042-…`). Los planes viven en
+  `<raíz>/plans/PLAN-<N>-<slug>/` donde la raíz es el repo (este) o un padre (el workspace multi-repo: `~/proyectos/mi-empresa/plans`).
 - La rama sale de `.git/HEAD` (o del `HEAD` del gitdir si `.git` es archivo, como en los worktrees);
   `agents.projectName` ya sigue ese gitdir.
 
@@ -51,7 +51,7 @@
   "ask":    { "kind": "question", "text": "¿Mergeo y reinstalo?", "more": 1 },
   "errors": { "windowMin": 10, "count": 6, "lastAt": 1791476712278, "high": true },
   "branch": "feat-plan-042-latido-front",
-  "plan":   { "number": 133, "name": "PLAN-042-ejemplo",
+  "plan":   { "number": 42, "name": "PLAN-042-ejemplo",
               "path": "/home/…/plans/PLAN-042-ejemplo",
               "total": 28, "done": 14, "inProgress": 2, "blocked": 4,
               "pending": 6, "skipped": 2, "unknown": 0 }

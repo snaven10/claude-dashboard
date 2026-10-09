@@ -475,7 +475,7 @@
       "lastAction": null,
       "orq": {
         "job": "aa11bb22",
-        "plan": "133",
+        "plan": "42",
         "task": "013",
         "specialist": "w",
         "ws": "demo"
@@ -491,7 +491,7 @@
       "errors": null,
       "branch": "feat-plan-042-latido-front",
       "plan": {
-        "number": 133,
+        "number": 42,
         "name": "PLAN-042-demo-sintetico",
         "path": "/home/user/demo/plans/PLAN-042-demo-sintetico",
         "total": 28,
@@ -530,7 +530,7 @@
       "lastAction": null,
       "orq": {
         "job": "aa11bb23",
-        "plan": "133",
+        "plan": "42",
         "task": "014",
         "specialist": "w",
         "ws": "demo"
@@ -546,7 +546,7 @@
       "errors": null,
       "branch": null,
       "plan": {
-        "number": 133,
+        "number": 42,
         "name": "PLAN-042-demo-sintetico",
         "path": "/home/user/demo/plans/PLAN-042-demo-sintetico",
         "total": 28,

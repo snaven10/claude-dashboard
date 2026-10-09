@@ -17,7 +17,7 @@ Cada sesión trae `branch` (DD-24) y `plan` (DD-23) según el contrato §4 del m
 - `projectName` cachea por cwd para siempre; `HEAD` y los `Estado:` cambian → esos NO se cachean para siempre (cache por `(mtime,size)` o releer, son archivos chicos).
 - Paquete nuevo `internal/plans`: dado `(número, raízRepo, home)` devuelve el avance. Formatos reales de `**Estado:**` que el parser debe tolerar (todos vistos hoy): `` `pending` ``, `done` (sin backticks), `Pendiente`, `pendiente`, `⬜ PENDIENTE · **Depende de:** …`, `🟢 \`pending\` — **DESBLOQUEADA…**`, `` `done` — cerrada 2026-08-30… ``, `sigue \`in_progress\`.`, `` `skipped` — DIFERIDO… ``.
 - Número de plan: `orq.Job.PlanTask()` (`internal/orq/orq.go`) si el key lo trae; si no, de la rama con `(?i)plan-?(\d+)`. Ej. reales de rama: `feat-plan-042-latido-front`, `plan-4-task-010`.
-- Layouts reales: `~/personal/claude-dashboard/plans/PLAN-004-abrir-en-telefono/tasks/TASK-010-….md` (plan en la raíz del repo) y `~/mi-empresa/plans/PLAN-042-…/tasks/` donde el repo es `~/mi-empresa/web-frontend` (plan en un PADRE del repo). Nunca subir más allá de `$HOME` (inyectable en tests).
+- Layouts reales: `~/personal/claude-dashboard/plans/PLAN-004-abrir-en-telefono/tasks/TASK-010-….md` (plan en la raíz del repo) y `~/proyectos/mi-empresa/plans/PLAN-042-…/tasks/` donde el repo es `~/proyectos/mi-empresa/web-frontend` (plan en un PADRE del repo). Nunca subir más allá de `$HOME` (inyectable en tests).
 - El cableado va en `internal/server/poller.go` (`enrich`); hay un test por campo que falla si el poller deja de pedirlo (`TestSessionsCarryTokens`): hacé lo mismo.
 - **Fixtures sintéticos** en `t.TempDir()`: armá repos falsos con `.git/HEAD`, worktree con `.git` archivo `gitdir: …`, y `plans/` falsos.
 

@@ -79,7 +79,7 @@
     return groups;
   }
 
-  // "PLAN-042 · 14/28 done · 4 blocked · 2 in_progress"; sin avance, solo "PLAN-N".
+  // "PLAN-42 · 14/28 done · 4 blocked · 2 in_progress"; sin avance, solo "PLAN-N".
   function planHeading(g) {
     var info = g && g.info;
     var head = g && g.plan !== null && g.plan !== undefined ? 'PLAN-' + g.plan : 'Sin plan';

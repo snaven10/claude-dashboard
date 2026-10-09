@@ -102,12 +102,12 @@ func TestFind(t *testing.T) {
 		t.Fatal(err)
 	}
 	mkPlan(t, parent, "PLAN-042-calidad", "`done`", "`done`")
-	if p := Find(133, repoB, home); p == nil || p.Total != 2 || p.Done != 2 {
+	if p := Find(42, repoB, home); p == nil || p.Total != 2 || p.Done != 2 {
 		t.Errorf("plan en padre: %+v", p)
 	}
-	// 13 NO matchea PLAN-042
-	if p := Find(13, repoB, home); p != nil {
-		t.Errorf("13 matcheó PLAN-042: %+v", p)
+	// 4 NO matchea PLAN-042
+	if p := Find(4, repoB, home); p != nil {
+		t.Errorf("4 matcheó PLAN-042: %+v", p)
 	}
 	// sin plan
 	if p := Find(99, repoB, home); p != nil {
@@ -283,7 +283,7 @@ func TestUnmergedNewestWorktreeWins(t *testing.T) {
 	}
 }
 
-// Layout MI-EMPRESA: el plan vive en un padre del repo → sin overlay.
+// Plan en un directorio padre del repo (workspace multi-repo): el plan vive fuera del repo → sin overlay.
 func TestUnmergedPlanInParentNoOverlay(t *testing.T) {
 	home := t.TempDir()
 	parent := filepath.Join(home, "ws")

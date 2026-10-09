@@ -18,7 +18,7 @@ vistazo cuál está trabajando, cuál terminó y cuál está **trabada esperánd
 - `~/.claude/sessions/<pid>.json` y `~/.claude/projects/**.jsonl` dan el detalle, pero son
   formato interno → solo para enriquecer, con degradación (DD-1).
 - Node 20 está EOL; el python local no tiene pip → **Go stdlib** (DD-5).
-- `orq` no podía despachar este plan (workspace `~/mi-empresa` fijo, `--add-dir ~/mi-empresa` forzado,
+- `orq` no podía despachar este plan (workspace `~/proyectos/mi-empresa` fijo, `--add-dir ~/proyectos/mi-empresa` forzado,
   sin specialist → sesión genérica en silencio). **Resuelto en el PLAN-001 de
   `orquestar-sesiones`** (workspaces `repo`, 3 escalones, scout, gate de spawn).
 
@@ -47,7 +47,7 @@ vistazo cuál está trabajando, cuál terminó y cuál está **trabada esperánd
 - Hooks hacia el server (eventos en tiempo real sub-segundo). Si 3 s de latencia no alcanzan → PLAN-002.
 - Acciones desde el panel (attach, stop, mandar mensajes). v1 es **solo lectura**; a lo sumo
   un botón que copia el comando `claude attach <id>`.
-- Sesiones de remota (vía SSH) y de claude.ai.
+- Sesiones de otra máquina (vía SSH) y de claude.ai.
 - Historial / métricas de costo.
 - Integrar con `orq` (mostrar tokens, olas). Candidato a PLAN-002.
 
