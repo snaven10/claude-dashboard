@@ -1,7 +1,7 @@
 # PLAN-009 — Publicación en GitHub: limpiar datos privados y reescribir el historial
 
 **Fecha:** 2026-10-09
-**Fase:** 2 (Ejecución) — aprobado 2026-10-09
+**Fase:** Cerrado
 **Proyectos:** claude-dashboard (`~/personal/claude-dashboard`)
 **Origen:** pedido del usuario — publicar el panel como repo público (MIT) para aportes de la comunidad
 
@@ -24,7 +24,7 @@ Este plan limpia el árbol, agrega licencia, reescribe el historial y publica.
 | Task | Qué | Especialista | Modelo | Depende de | Estado |
 |------|-----|--------------|--------|------------|--------|
 | **TASK-020** | Limpiar árbol: fixtures, tests, comentarios, planes, agente; `LICENSE` MIT; README de instalación | claude-dashboard-worker | sonnet | — | `done` |
-| **TASK-021** | Reescribir historial y publicar (gate del usuario antes del push) | orquestador | — | TASK-020 | `pending` |
+| **TASK-021** | Reescribir historial y publicar (gate del usuario antes del push) | orquestador | — | TASK-020 | `done` |
 
 ### Paralelismo
 
@@ -42,4 +42,8 @@ TASK-020 puede correr en paralelo con PLAN-002 de orq (otro repo). TASK-021 comp
 - Soporte de otros sistemas además de Linux/WSL con systemd `--user` (el README lo dice).
 
 ## 5. Cierre
-<!-- SE LLENA AL CERRAR EL PLAN -->
+- **Cerrado:** 2026-10-09
+- **Shipeó:** https://github.com/snaven10/claude-dashboard (público, MIT). TASK-020 (árbol limpio, LICENSE, README de instalación) y TASK-021 (historial reescrito, README nuevo, publicación).
+- **Verificación:** ver el Resultado de TASK-021: 0 restos en todo el historial, tests en verde en el repo reescrito, servicio reinstalado desde el repo publicado (HTTP 200).
+- **Quedó afuera:** CI, releases con binarios, README en inglés (§4).
+- **Continúa en:** —
