@@ -14,7 +14,7 @@
       "startedAt": 1791476356334,
       "lastActivityAt": 1791476700000,
       "remote": true,
-      "remoteUrl": "https://claude.ai/code/session_01PheFY7bAAutvpmHjzYFAFy",
+      "remoteUrl": "https://claude.ai/code/session_01FakeFixtureIdAbCdEfGhI",
       "title": "Refactor del módulo de pagos",
       "lastPrompt": "Refactorizá el módulo de pagos para separar el cliente HTTP del dominio y agregá tests para los casos de error. Mantené la API pública sin cambios.",
       "lastAction": {

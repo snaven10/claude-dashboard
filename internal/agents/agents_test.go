@@ -136,7 +136,7 @@ func TestProjectName(t *testing.T) {
 }
 
 func TestRemoteURL(t *testing.T) {
-	valid := "session_01PheFY7bAAutvpmHjzYFAFy"
+	valid := "session_01FakeFixtureIdAbCdEfGhI"
 	got := remoteURL(valid)
 	if got == nil || *got != "https://claude.ai/code/"+valid {
 		t.Fatalf("id válido: %v", got)
@@ -144,14 +144,14 @@ func TestRemoteURL(t *testing.T) {
 	invalid := map[string]string{
 		"vacío":         "",
 		"formato viejo": "bridge-x",
-		"con /":         "session_01PheFY7/../x",
-		"con ?":         "session_01PheFY7bAAutv?x=1",
-		"con espacios":  "session_01PheFY7 bAAutv",
-		"con salto":     "session_01PheFY7bAAutv\n",
+		"con /":         "session_01FakeFi/../x",
+		"con ?":         "session_01FakeFixtureI?x=1",
+		"con espacios":  "session_01FakeFi bAAutv",
+		"con salto":     "session_01FakeFixtureI\n",
 		"muy corto":     "session_abc",
 		"muy largo":     "session_" + strings.Repeat("a", 65),
-		"sin prefijo":   "01PheFY7bAAutvpmHjzYFAFy",
-		"con guion":     "session_01PheFY7-bAAutv",
+		"sin prefijo":   "01FakeFixtureIdAbCdEfGhI",
+		"con guion":     "session_01FakeFi-bAAutv",
 	}
 	for name, id := range invalid {
 		if got := remoteURL(id); got != nil {
@@ -164,7 +164,7 @@ func TestRemoteURL(t *testing.T) {
 }
 
 func TestRemoteURLEnNormalize(t *testing.T) {
-	id := "session_01PheFY7bAAutvpmHjzYFAFy"
+	id := "session_01FakeFixtureIdAbCdEfGhI"
 	s := normalize(rawAgent{ID: "x", Kind: "interactive"}, rawSession{BridgeSessionID: id})
 	if !s.Remote || s.RemoteURL == nil || *s.RemoteURL != "https://claude.ai/code/"+id {
 		t.Errorf("válido: %+v", s)

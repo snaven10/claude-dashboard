@@ -11,7 +11,7 @@ el teléfono desde el panel. Ahora: botón "📱 abrir en el teléfono" con QR y
 
 ## 2. Hallazgos (verificados 2026-10-08)
 - **El link es `https://claude.ai/code/<bridgeSessionId>`.** Comprobado con esta misma sesión: su
-  `bridgeSessionId` (F2) es `session_01PheFY7bAAutvpmHjzYFAFy`, el mismo id de su link de claude.ai.
+  `bridgeSessionId` (F2) es el mismo id que aparece en su link de claude.ai (no se copia acá: es un id real).
   La doc oficial solo dice que el id es "the part of the session's URL at claude.ai/code between
   `/code/` and any `?`" → el formato `session_…` NO está documentado: se valida (DD-18).
 - Activar Remote Control dentro de una sesión: **`/remote-control`** (alias **`/rc`**), según

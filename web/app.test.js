@@ -134,7 +134,7 @@ test('matchesQuery: campos, tildes, mayúsculas, orq y vacío', () => {
 const fs = require('node:fs');
 const qrcode = require('./vendor/qrcode.js');
 const BASE = 'https://claude.ai/' + 'code/';
-const ID = 'session_01PheFY7bAAutvpmHjzYFAFy';
+const ID = 'session_01FakeFixtureIdAbCdEfGhI';
 const RURL = BASE + ID;
 
 test('phoneMode: qué ve cada tipo de sesión (DD-20)', () => {
