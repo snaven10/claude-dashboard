@@ -1,6 +1,7 @@
 package transcript
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -413,5 +414,197 @@ func TestErrorsResetOnTruncate(t *testing.T) {
 	}
 	if e, _ := Errors("/work/usage", "sess-u", now); e == nil || e.Count != 1 {
 		t.Fatalf("después de truncar: %+v, quiero 1", e)
+	}
+}
+
+func prLine(n int, url string) string {
+	return fmt.Sprintf(`{"type":"pr-link","prNumber":%d,"prRepository":"grupo/repo","prUrl":%q,"sessionId":"s","timestamp":"2026-01-01T10:00:00.000Z"}`+"\n", n, url)
+}
+
+func TestExtrasPRs(t *testing.T) {
+	_, path := usageSetup(t)
+	var b strings.Builder
+	for i := 1; i <= 7; i++ {
+		b.WriteString(prLine(i, fmt.Sprintf("https://git.ejemplo/g/r/-/merge_requests/%d", i)))
+		if i == 2 { // inválidos intercalados
+			b.WriteString(prLine(90, "http://git.ejemplo/inseguro"))
+			b.WriteString(prLine(91, "javascript:alert(1)"))
+			b.WriteString(prLine(0, "https://git.ejemplo/g/r/-/merge_requests/0"))
+		}
+	}
+	b.WriteString(prLine(3, "https://git.ejemplo/g/r/-/merge_requests/3")) // repetido: gana el más reciente
+	if err := os.WriteFile(path, []byte(b.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e, err := ExtrasFor("/work/usage", "sess-u", time.Now())
+	if err != nil || e == nil {
+		t.Fatalf("e=%v err=%v", e, err)
+	}
+	var got []int
+	for _, p := range e.PRs {
+		got = append(got, p.Number)
+		if !strings.HasPrefix(p.URL, "https://") || p.Repo != "grupo/repo" {
+			t.Errorf("PR inválido: %+v", p)
+		}
+	}
+	if fmt.Sprint(got) != "[4 5 6 7 3]" {
+		t.Errorf("prs = %v, quiero [4 5 6 7 3] (dedup por URL, últimos 5, sin http/javascript/0)", got)
+	}
+}
+
+func TestExtrasArtifacts(t *testing.T) {
+	_, path := usageSetup(t)
+	frame := func(url, title string) string {
+		return fmt.Sprintf(`{"type":"frame-link","frameUrl":%q,"title":%q,"artifactCount":1,"path":"/x","timestamp":"2026-01-01T10:00:00.000Z"}`+"\n", url, title)
+	}
+	body := frame("", "vacío") + frame("https://evil.example/claude.ai/x", "otro host") +
+		frame("http://claude.ai/a", "sin tls") + frame("https://claude.ai/artifact/a", "Plan A") +
+		frame("https://claude.ai/artifact/a", "Plan A") + frame("https://claude.ai/artifact/b", strings.Repeat("t", 300))
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e, err := ExtrasFor("/work/usage", "sess-u", time.Now())
+	if err != nil || e == nil {
+		t.Fatalf("e=%v err=%v", e, err)
+	}
+	if len(e.Artifacts) != 2 || e.Artifacts[0].URL != "https://claude.ai/artifact/a" || e.Artifacts[1].URL != "https://claude.ai/artifact/b" {
+		t.Fatalf("artifacts = %+v", e.Artifacts)
+	}
+	if n := len([]rune(e.Artifacts[1].Title)); n != 200 {
+		t.Errorf("título de %d runas, quiero 200", n)
+	}
+}
+
+func TestExtrasLinesLastAndNoCost(t *testing.T) {
+	_, path := usageSetup(t)
+	cost := func(a, r int) string {
+		return fmt.Sprintf(`{"type":"cost-state","totalLinesAdded":%d,"totalLinesRemoved":%d,"totalCostUSD":12.34,"timestamp":"2026-01-01T10:00:00.000Z"}`+"\n", a, r)
+	}
+	if err := os.WriteFile(path, []byte(cost(10, 1)+cost(412, 96)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e, err := ExtrasFor("/work/usage", "sess-u", time.Now())
+	if err != nil || e == nil || e.Lines == nil {
+		t.Fatalf("e=%+v err=%v", e, err)
+	}
+	if *e.Lines != (Lines{Added: 412, Removed: 96}) {
+		t.Errorf("lines = %+v, quiero el ÚLTIMO cost-state", *e.Lines)
+	}
+	js, _ := json.Marshal(e)
+	if s := strings.ToLower(string(js)); strings.Contains(s, "cost") || strings.Contains(s, "12.34") {
+		t.Errorf("el costo no puede salir: %s", js)
+	}
+}
+
+func TestExtrasPermissionMode(t *testing.T) {
+	_, path := usageSetup(t)
+	pm := func(v string) string {
+		return fmt.Sprintf(`{"type":"permission-mode","permissionMode":%q,"sessionId":"s"}`+"\n", v)
+	}
+	cases := []struct{ body, want string }{
+		{pm("default") + pm("acceptEdits"), "acceptEdits"},
+		{pm("auto") + pm("<x>"), ""},
+		{pm("auto") + pm(strings.Repeat("a", 40)), ""},
+		{pm("auto") + pm("a b"), ""},
+	}
+	for _, c := range cases {
+		if err := os.WriteFile(path, []byte(c.body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		usageMu.Lock()
+		usageStates = map[string]*usageState{} // un estado limpio por caso
+		usageMu.Unlock()
+		e, err := ExtrasFor("/work/usage", "sess-u", time.Now())
+		if err != nil || e == nil {
+			t.Fatalf("e=%v err=%v", e, err)
+		}
+		if e.PermissionMode != c.want {
+			t.Errorf("permissionMode = %q, quiero %q", e.PermissionMode, c.want)
+		}
+	}
+}
+
+func TestExtrasIncrementalReadsNothing(t *testing.T) {
+	_, path := usageSetup(t)
+	body := prLine(1, "https://git.ejemplo/g/r/-/merge_requests/1") + asstLine("m1", 1, 2, 3, 4, "m")
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	if _, err := ExtrasFor("/work/usage", "sess-u", now); err != nil {
+		t.Fatal(err)
+	}
+	first := usageBytesRead.Load()
+	if first == 0 {
+		t.Fatal("la primera pasada tiene que leer")
+	}
+	// 2º ciclo sin cambios, también mezclando con Usage/Activity/Errors: 0 bytes
+	if _, err := ExtrasFor("/work/usage", "sess-u", now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Usage("/work/usage", "sess-u"); err != nil {
+		t.Fatal(err)
+	}
+	if got := usageBytesRead.Load(); got != first {
+		t.Errorf("2º ciclo leyó %d bytes de más", got-first)
+	}
+	// crece: solo lee lo nuevo
+	add := prLine(2, "https://git.ejemplo/g/r/-/merge_requests/2")
+	appendFile(t, path, add)
+	e, _ := ExtrasFor("/work/usage", "sess-u", now)
+	if got := usageBytesRead.Load() - first; got != int64(len(add)) {
+		t.Errorf("leyó %d bytes, quiero %d (solo lo nuevo)", got, len(add))
+	}
+	if e == nil || len(e.PRs) != 2 {
+		t.Errorf("prs tras crecer = %+v", e)
+	}
+}
+
+// Solo inválidos: ninguno puede entrar (si se insertan al principio, el límite
+// de 5 los saca igual y el test no prueba la validación).
+func TestExtrasPRsRejectsInvalid(t *testing.T) {
+	_, path := usageSetup(t)
+	body := prLine(90, "http://git.ejemplo/inseguro") + prLine(91, "javascript:alert(1)") +
+		prLine(0, "https://git.ejemplo/g/r/-/merge_requests/0") + prLine(-3, "https://git.ejemplo/g/r/-/merge_requests/x")
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e, err := ExtrasFor("/work/usage", "sess-u", time.Now())
+	if err != nil || e == nil {
+		t.Fatalf("e=%v err=%v", e, err)
+	}
+	if len(e.PRs) != 0 {
+		t.Fatalf("aceptó PRs inválidos: %+v", e.PRs)
+	}
+}
+
+// Un transcript truncado o rotado empieza de cero también para los extras.
+func TestExtrasResetOnTruncate(t *testing.T) {
+	_, path := usageSetup(t)
+	if err := os.WriteFile(path, []byte(prLine(1, "https://git.ejemplo/g/r/-/merge_requests/1")+prLine(2, "https://git.ejemplo/g/r/-/merge_requests/2")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if e, _ := ExtrasFor("/work/usage", "sess-u", time.Now()); e == nil || len(e.PRs) != 2 {
+		t.Fatalf("antes: %+v", e)
+	}
+	if err := os.WriteFile(path, []byte(prLine(3, "https://git.ejemplo/g/r/-/merge_requests/3")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if e, _ := ExtrasFor("/work/usage", "sess-u", time.Now()); e == nil || len(e.PRs) != 1 || e.PRs[0].Number != 3 {
+		t.Fatalf("después de truncar: %+v, quiero solo el PR 3", e)
+	}
+}
+
+// Una línea de assistant que menciona el marcador en su texto sin escapar NO
+// pierde su conteo de tokens.
+func TestExtraMarkerInOtherLineKeepsUsage(t *testing.T) {
+	_, path := usageSetup(t)
+	line := `{"type":"assistant","note":{"type":"pr-link"},"message":{"id":"m1","model":"m","usage":{"input_tokens":1,"output_tokens":7,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}` + "\n"
+	if err := os.WriteFile(path, []byte(line), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tk, err := Usage("/work/usage", "sess-u")
+	if err != nil || tk == nil || tk.Output != 7 {
+		t.Fatalf("tokens=%+v err=%v, quiero output 7", tk, err)
 	}
 }

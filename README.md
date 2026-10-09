@@ -29,6 +29,16 @@ PLAN-005 suma, de la misma lectura del transcript:
 |-------|--------|
 | `ask` | `{kind, text, more}` con lo último que la sesión dejó abierto, en este orden: un `AskUserQuestion` sin respuesta (`kind:"question"`, `text` = la primera pregunta, `more` = preguntas restantes); una herramienta sin resultado (`kind:"tool"`, `"Bash: git push"`, o sea un permiso pedido si la sesión está `waiting`); el último texto del asistente desde el último prompt real (`kind:"text"`), aunque después haya resultados de herramientas: un permiso pendiente NO queda en el transcript, así que en una `waiting` lo que se ve es lo último que Claude dijo. `null` si no hay texto del asistente desde el último prompt. Una línea, 300 caracteres como máximo. |
 | `errors` | `{windowMin: 10, count, lastAt, high}`: `tool_result` con `is_error` de los últimos 10 min. No cuentan los rechazos del usuario ni las interrupciones. `high` si `count >= -errors-warn` (default `5`, `0` lo desactiva). `null` sin errores en la ventana. Se calcula incrementalmente, sin releer el archivo. |
+| `away` | `{text, at}`: el último resumen `away_summary` ("mientras no estabas") **posterior al último prompt real**; una línea, 400 caracteres como máximo. `null` si es anterior al prompt o no hay. |
+| `turnStartedAt` | ms epoch del último prompt real (el inicio del turno actual; el frontend lo usa solo en `busy`). `null` sin dato. |
+| `prs` | Hasta 5 `{number, url, repo}` de los `pr-link` (los últimos, distintos por URL). Solo `https://` y número > 0. `[]` sin dato. |
+| `artifacts` | Hasta 5 `{title, url}` de los `frame-link` con `frameUrl` que empiece con `https://claude.ai/` (los vacíos se descartan). `[]` sin dato. |
+| `lines` | `{added, removed}` del último `cost-state`. **El costo en dólares no se expone.** `null` sin dato. |
+| `permissionMode` | Último `permission-mode` (`auto`, `acceptEdits`, `default`…), solo letras 1-32; un valor raro da `null`. |
+| `subagents` | `{active, total}`: archivos `*.jsonl` de `<sessionId>/subagents/` junto al transcript; `active` = modificados en los últimos 120 s. `null` si el directorio no existe. Un `ReadDir` por sesión por ciclo, sin leer contenido. |
+
+`prs`, `artifacts`, `lines` y `permissionMode` salen de la misma pasada incremental de tokens/errores
+(pueden estar al principio del archivo); `away` y `turnStartedAt`, de la cola del transcript.
 
 `GET /api/sessions/{sessionId}/timeline` devuelve `{sessionId, events}` con los últimos 20 eventos
 (`prompt` | `tool` | `text`, del más viejo al más nuevo), leídos de la cola del transcript. Solo acepta

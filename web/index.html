@@ -15,9 +15,10 @@
       <span id="conn" class="conn conn-off" role="status" aria-live="polite">conectando…</span>
     </div>
     <div class="counters" aria-label="Resumen">
-      <button type="button" id="c-waiting" class="counter c-waiting" aria-pressed="false" title="Filtrar por este estado"><b id="n-waiting">0</b> esperándote</button>
-      <button type="button" id="c-busy" class="counter c-busy" aria-pressed="false" title="Filtrar por este estado"><b id="n-busy">0</b> trabajando</button>
-      <button type="button" id="c-idle" class="counter c-idle" aria-pressed="false" title="Filtrar por este estado"><b id="n-idle">0</b> idle</button>
+      <button type="button" id="c-waiting" class="counter c-waiting" aria-pressed="false" title="Filtrar por este estado (1)"><b id="n-waiting">0</b> esperándote</button>
+      <button type="button" id="c-busy" class="counter c-busy" aria-pressed="false" title="Filtrar por este estado (2)"><b id="n-busy">0</b> trabajando</button>
+      <button type="button" id="c-idle" class="counter c-idle" aria-pressed="false" title="Filtrar por este estado (3)"><b id="n-idle">0</b> idle</button>
+      <span id="today" class="today" hidden></span>
     </div>
     <div class="filters">
       <label>Proyecto
@@ -31,11 +32,22 @@
       </label>
       <button type="button" id="btn-notify" aria-pressed="false">activar avisos</button>
       <button type="button" id="btn-history">📊 historial</button>
+      <span class="kbd-hint"><kbd>j</kbd>/<kbd>k</kbd> moverse · <kbd>Enter</kbd> abrir · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> filtrar · <kbd>/</kbd> buscar · <kbd>Esc</kbd> volver</span>
     </div>
   </header>
   <main>
+    <section class="inbox" aria-labelledby="inbox-title">
+      <h2 id="inbox-title">Te esperan</h2>
+      <div id="inbox-items" class="inbox-items"></div>
+    </section>
     <p id="empty" class="empty" hidden>No hay sesiones para mostrar.</p>
-    <section id="grid" class="grid" aria-label="Sesiones"></section>
+    <div class="split">
+      <section class="list" aria-labelledby="list-title">
+        <h2 id="list-title">Sesiones</h2>
+        <div id="rows" class="rows" role="listbox" aria-label="Sesiones"></div>
+      </section>
+      <aside id="detail" class="detail" aria-live="polite" aria-label="Detalle de la sesión"></aside>
+    </div>
   </main>
   <div id="history" class="overlay" hidden>
     <div class="panel" role="dialog" aria-modal="true" aria-labelledby="history-title">
@@ -44,24 +56,6 @@
         <button type="button" id="history-close" aria-label="Cerrar (Esc)">✕</button>
       </div>
       <div id="history-body" class="panel-body"></div>
-    </div>
-  </div>
-  <div id="timeline" class="overlay" hidden>
-    <div class="panel" role="dialog" aria-modal="true" aria-labelledby="timeline-title">
-      <div class="panel-head">
-        <h2 id="timeline-title"></h2>
-        <button type="button" id="timeline-close" aria-label="Cerrar (Esc)">✕</button>
-      </div>
-      <div id="timeline-body" class="panel-body"></div>
-    </div>
-  </div>
-  <div id="phone" class="overlay" hidden>
-    <div class="panel" role="dialog" aria-modal="true" aria-labelledby="phone-title">
-      <div class="panel-head">
-        <h2 id="phone-title">Abrir en el teléfono</h2>
-        <button type="button" id="phone-close" aria-label="Cerrar (Esc)">✕</button>
-      </div>
-      <div id="phone-body" class="panel-body phone-body"></div>
     </div>
   </div>
   <script src="vendor/qrcode.js"></script>

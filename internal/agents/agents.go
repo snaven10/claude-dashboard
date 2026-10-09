@@ -64,6 +64,46 @@ type Session struct {
 	Errors         *Errors     `json:"errors"`
 	Branch         *string     `json:"branch"`
 	Plan           *Plan       `json:"plan"`
+
+	// PLAN-008 (DD-35). Las listas son [] sin dato y el resto null; nunca hay costo (DD-11).
+	Away           *Away      `json:"away"`
+	PRs            []PR       `json:"prs"`
+	Artifacts      []Artifact `json:"artifacts"`
+	Lines          *Lines     `json:"lines"`
+	PermissionMode *string    `json:"permissionMode"`
+	Subagents      *Subagents `json:"subagents"`
+	TurnStartedAt  *int64     `json:"turnStartedAt"`
+}
+
+// Away es el resumen "mientras no estabas" (posterior al último prompt).
+type Away struct {
+	Text string `json:"text"`
+	At   int64  `json:"at"`
+}
+
+// PR es un pull/merge request linkeado desde la sesión.
+type PR struct {
+	Number int    `json:"number"`
+	URL    string `json:"url"`
+	Repo   string `json:"repo"`
+}
+
+// Artifact es un artifact de claude.ai linkeado desde la sesión.
+type Artifact struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
+}
+
+// Lines son las líneas agregadas y quitadas acumuladas de la sesión.
+type Lines struct {
+	Added   int64 `json:"added"`
+	Removed int64 `json:"removed"`
+}
+
+// Subagents cuenta los transcripts de subagentes: activos (últimos 120 s) y totales.
+type Subagents struct {
+	Active int `json:"active"`
+	Total  int `json:"total"`
 }
 
 // Ask es lo último que la sesión dejó abierto (DD-21): "question", "tool" o "text".
