@@ -1,7 +1,7 @@
 # PLAN-008 — Datos nuevos por sesión: mientras no estabas, PRs, subagentes, líneas, turno y permisos
 
 **Fecha:** 2026-10-09
-**Fase:** Aprobado — en ejecución
+**Fase:** Cerrado
 **Proyectos:** claude-dashboard (`~/personal/claude-dashboard`)
 **Origen:** investigación de registros del transcript sin usar + maqueta aprobada (`../PLAN-007-bandeja/maqueta.html`)
 
@@ -28,8 +28,8 @@ Mostrar en la bandeja (PLAN-007) lo que Claude Code ya registra y el panel ignor
 ## 3. Tasks y orden
 | Task | Qué | Especialista | Modelo | Depende de | Estado |
 |------|-----|--------------|--------|------------|--------|
-| **TASK-018** | Backend: `away`, `prs`, `artifacts`, `lines`, `permissionMode`, `subagents`, `turnStartedAt` | claude-dashboard-worker | sonnet | contrato §4 | `pending` |
-| **TASK-019** | Frontend: mostrar los datos nuevos en filas y detalle de la bandeja | claude-dashboard-worker | sonnet | TASK-017 (PLAN-007) mergeada + contrato §4 | `pending` |
+| **TASK-018** | Backend: `away`, `prs`, `artifacts`, `lines`, `permissionMode`, `subagents`, `turnStartedAt` | claude-dashboard-worker | sonnet | contrato §4 | `done` |
+| **TASK-019** | Frontend: mostrar los datos nuevos en filas y detalle de la bandeja | claude-dashboard-worker | sonnet | TASK-017 (PLAN-007) mergeada + contrato §4 | `done` |
 
 ### Paralelismo
 
@@ -80,3 +80,14 @@ Cualquiera es `null` (o `[]` en las listas) sin dato.
 - Cola de mensajes y `pendingBackgroundAgentCount` (no confiables, §2). Costo en dólares.
 
 ## 6. Cierre
+- **Cerrado:** 2026-10-09
+- **Shipeó:** rama `main`. TASK-018 `d7b042d` (mergeada con PLAN-007 en `1a142d5`) y TASK-019 `e95a35c` (merge "PLAN-008 TASK-019 con QA"), más arreglos de QA. Servicio reinstalado.
+- **Verificación:**
+  - `go test -race ./...` (6 paquetes) y 53 tests de node en `main`; código idéntico a las ramas de integración que pasaron QA.
+  - Recuento independiente contra 36 sesiones reales con transcript: `prs`, `artifacts`, `lines`, `permissionMode` **36/36**; `away` 36/36 (la única diferencia inicial era el resumen escrito entre el snapshot y el recuento; re-pedido, coincide). El JSON del snapshot no contiene `totalCostUSD` ni `cost`.
+  - Navegador: con fixture, chips/“Mientras no estabas”/links con `noopener noreferrer`, hostil inerte, ningún `href` que no sea `https://`; con datos reales 28/36 filas con chips, sin scroll horizontal.
+  - Mutaciones: 018 → 2 validaciones de PR sobrevivían (el test insertaba los inválidos al principio y el límite de 5 los sacaba igual) y el reset al truncar no tenía test → tests nuevos que fallan con el código mutado. 019 → validación de URL cubierta (una mutación agresiva rompe 3 tests).
+  - **Bug que la QA atrapó (018):** una línea con el marcador `"type":"pr-link"` (u otro) que no fuera de ese tipo se saltaba su conteo de tokens → `consumeExtra` devuelve si consumió; test nuevo.
+- **NO verificado:** `subagents.active > 0` con una sesión real (hoy 0 activos); `turnStartedAt` de un turno real ≥ 15 min.
+- **Quedó afuera:** cola de mensajes y `pendingBackgroundAgentCount` (§2), costo en dólares.
+- **Continúa en:** —
