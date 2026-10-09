@@ -427,8 +427,7 @@ func (st *usageState) consume(data []byte) {
 		}
 		// Filtro barato (bytes.Contains) antes de cualquier Unmarshal: esto
 		// corre sobre GBs al arrancar.
-		if kind := extraKind(raw); kind != "" {
-			st.consumeExtra(kind, raw)
+		if kind := extraKind(raw); kind != "" && st.consumeExtra(kind, raw) {
 			continue
 		}
 		var l usageLine

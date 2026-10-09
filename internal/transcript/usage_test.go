@@ -559,3 +559,52 @@ func TestExtrasIncrementalReadsNothing(t *testing.T) {
 		t.Errorf("prs tras crecer = %+v", e)
 	}
 }
+
+// Solo inválidos: ninguno puede entrar (si se insertan al principio, el límite
+// de 5 los saca igual y el test no prueba la validación).
+func TestExtrasPRsRejectsInvalid(t *testing.T) {
+	_, path := usageSetup(t)
+	body := prLine(90, "http://git.ejemplo/inseguro") + prLine(91, "javascript:alert(1)") +
+		prLine(0, "https://git.ejemplo/g/r/-/merge_requests/0") + prLine(-3, "https://git.ejemplo/g/r/-/merge_requests/x")
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e, err := ExtrasFor("/work/usage", "sess-u", time.Now())
+	if err != nil || e == nil {
+		t.Fatalf("e=%v err=%v", e, err)
+	}
+	if len(e.PRs) != 0 {
+		t.Fatalf("aceptó PRs inválidos: %+v", e.PRs)
+	}
+}
+
+// Un transcript truncado o rotado empieza de cero también para los extras.
+func TestExtrasResetOnTruncate(t *testing.T) {
+	_, path := usageSetup(t)
+	if err := os.WriteFile(path, []byte(prLine(1, "https://git.ejemplo/g/r/-/merge_requests/1")+prLine(2, "https://git.ejemplo/g/r/-/merge_requests/2")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if e, _ := ExtrasFor("/work/usage", "sess-u", time.Now()); e == nil || len(e.PRs) != 2 {
+		t.Fatalf("antes: %+v", e)
+	}
+	if err := os.WriteFile(path, []byte(prLine(3, "https://git.ejemplo/g/r/-/merge_requests/3")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if e, _ := ExtrasFor("/work/usage", "sess-u", time.Now()); e == nil || len(e.PRs) != 1 || e.PRs[0].Number != 3 {
+		t.Fatalf("después de truncar: %+v, quiero solo el PR 3", e)
+	}
+}
+
+// Una línea de assistant que menciona el marcador en su texto sin escapar NO
+// pierde su conteo de tokens.
+func TestExtraMarkerInOtherLineKeepsUsage(t *testing.T) {
+	_, path := usageSetup(t)
+	line := `{"type":"assistant","note":{"type":"pr-link"},"message":{"id":"m1","model":"m","usage":{"input_tokens":1,"output_tokens":7,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}` + "\n"
+	if err := os.WriteFile(path, []byte(line), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tk, err := Usage("/work/usage", "sess-u")
+	if err != nil || tk == nil || tk.Output != 7 {
+		t.Fatalf("tokens=%+v err=%v, quiero output 7", tk, err)
+	}
+}

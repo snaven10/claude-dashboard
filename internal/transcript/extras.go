@@ -90,27 +90,29 @@ type extraLine struct {
 	PermissionModeV string `json:"permissionMode"`
 }
 
-func (st *usageState) consumeExtra(kind string, raw []byte) {
+// consumeExtra devuelve false si la línea no es de verdad de ese tipo (el
+// marcador apareció en otro lado): entonces sigue su camino normal.
+func (st *usageState) consumeExtra(kind string, raw []byte) bool {
 	var l extraLine
 	if json.Unmarshal(raw, &l) != nil || l.Type != kind {
-		return
+		return false
 	}
 	switch kind {
 	case "pr-link":
 		if l.PRNumber <= 0 || !strings.HasPrefix(l.PRURL, "https://") || len(l.PRURL) > maxURL {
-			return
+			return true
 		}
 		st.prs = pushDistinct(st.prs, PR{Number: l.PRNumber, URL: l.PRURL, Repo: truncate(oneLine(l.PRRepository), maxRepo)},
 			func(p PR) string { return p.URL }, maxPRs)
 	case "frame-link":
 		if !strings.HasPrefix(l.FrameURL, "https://claude.ai/") || len(l.FrameURL) > maxURL {
-			return
+			return true
 		}
 		st.artifacts = pushDistinct(st.artifacts, Artifact{Title: truncate(oneLine(l.Title), maxTitle), URL: l.FrameURL},
 			func(a Artifact) string { return a.URL }, maxArtifacts)
 	case "cost-state":
 		if l.LinesAdded == nil || l.LinesRemoved == nil || *l.LinesAdded < 0 || *l.LinesRemoved < 0 {
-			return
+			return true
 		}
 		st.lines = &Lines{Added: *l.LinesAdded, Removed: *l.LinesRemoved}
 	case "permission-mode":
@@ -121,6 +123,7 @@ func (st *usageState) consumeExtra(kind string, raw []byte) {
 			st.permissionMode = ""
 		}
 	}
+	return true
 }
 
 // pushDistinct agrega v al final; si ya había uno con la misma clave, lo mueve
