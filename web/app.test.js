@@ -445,3 +445,104 @@ test('plainText: encabezados que quedan en medio al juntar líneas', () => {
   assert.strictEqual(bandeja.plainText('Keycloak cerrado.\n## Lo de Keycloak: listo'), 'Keycloak cerrado. Lo de Keycloak: listo');
   assert.strictEqual(bandeja.plainText('PR #87 y C# quedan'), 'PR #87 y C# quedan');
 });
+
+// ---- PLAN-008 / TASK-019: datos de sesión ----
+
+const T0 = 1791476712278;
+const MIN = 60000;
+const chipTexts = (x) => bandeja.sessionChips(x, T0).map((c) => c.text);
+
+test('chips: subagentes solo con activos > 0', () => {
+  assert.deepStrictEqual(chipTexts(s('a', 'idle', { subagents: { active: 0, total: 5 } })), []);
+  assert.deepStrictEqual(chipTexts(s('a', 'idle', { subagents: null })), []);
+  assert.deepStrictEqual(chipTexts(s('a', 'idle', { subagents: { active: 1, total: 5 } })), ['1 subagente']);
+  assert.deepStrictEqual(chipTexts(s('a', 'idle', { subagents: { active: 2, total: 7 } })), ['2 subagentes']);
+});
+
+test('chips: turno solo busy y >= 15 min', () => {
+  assert.deepStrictEqual(chipTexts(s('a', 'busy', { turnStartedAt: T0 - 14 * MIN })), []);
+  assert.deepStrictEqual(chipTexts(s('a', 'busy', { turnStartedAt: T0 - 15 * MIN })), ['turno de 15 min']);
+  assert.deepStrictEqual(chipTexts(s('a', 'busy', { turnStartedAt: T0 - 42 * MIN })), ['turno de 42 min']);
+  assert.deepStrictEqual(chipTexts(s('a', 'idle', { turnStartedAt: T0 - 42 * MIN })), []);
+  assert.deepStrictEqual(chipTexts(s('a', 'busy', { turnStartedAt: null })), []);
+  assert.strictEqual(bandeja.turnMinutes(s('a', 'waiting', { turnStartedAt: T0 - 20 * MIN }), T0), null);
+  assert.strictEqual(bandeja.turnMinutes(s('a', 'busy', { turnStartedAt: T0 + 5 * MIN }), T0), 0);
+});
+
+test('chips: permisos ocultos en default y con valores raros', () => {
+  assert.deepStrictEqual(chipTexts(s('a', 'idle', { permissionMode: 'default' })), []);
+  assert.deepStrictEqual(chipTexts(s('a', 'idle', { permissionMode: null })), []);
+  assert.deepStrictEqual(chipTexts(s('a', 'idle', { permissionMode: 'auto' })), ['auto']);
+  assert.deepStrictEqual(chipTexts(s('a', 'idle', { permissionMode: '<img src=x>' })), []);
+});
+
+test('chips: PR (el último válido), líneas y orden', () => {
+  const x = s('a', 'busy', {
+    subagents: { active: 2, total: 7 }, turnStartedAt: T0 - 20 * MIN, permissionMode: 'auto',
+    lines: { added: 412, removed: 96 },
+    prs: [{ number: 85, url: 'https://gl.test/mr/85', repo: 'g/r' }, { number: 87, url: 'https://gl.test/mr/87', repo: 'g/r' }],
+  });
+  assert.deepStrictEqual(chipTexts(x), ['2 subagentes', 'PR #87', '+412 −96', 'turno de 20 min', 'auto']);
+  assert.deepStrictEqual(chipTexts(s('a', 'idle', { lines: { added: 0, removed: 0 } })), []);
+});
+
+test('URL hostil descartada: PR y artifacts', () => {
+  assert.strictEqual(bandeja.validPrUrl('https://gitlab.ejemplo/g/r/-/merge_requests/1'), true);
+  ['javascript:alert(1)', 'http://x.test/1', 'https://x.test/a b', 'https://x.test/"onmouseover=1', "https://x.test/'", 'data:text/html,x', '', null, 5]
+    .forEach((u) => assert.strictEqual(bandeja.validPrUrl(u), false, String(u)));
+  assert.strictEqual(bandeja.validArtifactUrl('https://claude.ai/artifact/abc'), true);
+  ['https://evil.example/claude.ai/', 'https://claude.ai.evil.test/x', 'http://claude.ai/x', 'javascript:alert(1)', 'https://claude.ai/a b', null]
+    .forEach((u) => assert.strictEqual(bandeja.validArtifactUrl(u), false, String(u)));
+  const x = s('a', 'idle', {
+    prs: [{ number: 66, url: 'javascript:alert(1)', repo: 'r' }, { number: 0, url: 'https://x.test/0' }, { number: 3, url: 'https://x.test/3' }],
+    artifacts: [{ title: 't', url: 'javascript:alert(2)' }, { title: 'ok', url: 'https://claude.ai/artifact/1' }],
+  });
+  assert.deepStrictEqual(bandeja.validPrs(x).map((p) => p.number), [3]);
+  assert.deepStrictEqual(bandeja.validArtifacts(x).map((a) => a.title), ['ok']);
+  assert.deepStrictEqual(chipTexts(s('a', 'idle', { prs: [{ number: 66, url: 'javascript:alert(1)' }] })), []);
+  assert.deepStrictEqual(bandeja.validPrs({}), []);
+});
+
+test('away: línea secundaria solo fuera de busy', () => {
+  const away = { text: 'Terminé la **migración**', at: T0 };
+  assert.strictEqual(bandeja.awayLine(s('a', 'waiting', { away })), 'Terminé la migración');
+  assert.strictEqual(bandeja.awayLine(s('a', 'idle', { away })), 'Terminé la migración');
+  assert.strictEqual(bandeja.awayLine(s('a', 'done', { away })), 'Terminé la migración');
+  assert.strictEqual(bandeja.awayLine(s('a', 'busy', { away })), '');
+  assert.strictEqual(bandeja.awayLine(s('a', 'idle', { away: null })), '');
+  assert.strictEqual(bandeja.awayLine(s('a', 'idle', {})), '');
+  // el HTML hostil queda como texto literal (quien lo pinta usa textContent)
+  assert.strictEqual(bandeja.awayLine(s('a', 'idle', { away: { text: '<img src=x onerror=alert(1)>' } })), '<img src=x onerror=alert(1)>');
+});
+
+test('búsqueda por PR y repo; el PR de URL hostil no se encuentra', () => {
+  const x = s('a', 'idle', { title: 'algo', prs: [{ number: 87, url: 'https://gl.test/mr/87', repo: 'grupo/demo-api' }] });
+  assert.ok(bandeja.matchesQuery(x, 'PR #87'));
+  assert.ok(bandeja.matchesQuery(x, 'pr 87'));
+  assert.ok(bandeja.matchesQuery(x, '#87'));
+  assert.ok(bandeja.matchesQuery(x, 'grupo/demo-api'));
+  assert.ok(!bandeja.matchesQuery(x, 'PR #88'));
+  const h = s('b', 'idle', { title: 'algo', prs: [{ number: 66, url: 'javascript:alert(1)', repo: 'zzz/repo' }] });
+  assert.ok(!bandeja.matchesQuery(h, 'zzz/repo'));
+  assert.ok(bandeja.matchesQuery(s('c', 'idle', { title: 'x' }), ''));
+});
+
+test('fixture: los 7 campos están en varias sesiones y lo hostil es inerte', () => {
+  const fx = require('./fixture.json');
+  const withKey = (k) => fx.sessions.filter((x) => (Array.isArray(x[k]) ? x[k].length : x[k] != null));
+  ['away', 'prs', 'artifacts', 'lines', 'permissionMode', 'subagents', 'turnStartedAt'].forEach((k) => {
+    assert.ok(withKey(k).length >= 2, k);
+  });
+  const hostil = fx.sessions.find((x) => x.name === 'hostil');
+  assert.ok(hostil.prs.some((p) => p.url.startsWith('javascript:')));
+  assert.deepStrictEqual(bandeja.validPrs(hostil), []);
+  assert.deepStrictEqual(bandeja.validArtifacts(hostil), []);
+  assert.deepStrictEqual(chipTexts(hostil), ['3 subagentes']);
+  fx.sessions.forEach((x) => {
+    bandeja.validPrs(x).forEach((p) => assert.ok(p.url.startsWith('https://')));
+    const c = bandeja.sessionChips(x, fx.generatedAt);
+    if (x.status !== 'busy') assert.ok(!c.some((y) => /^turno/.test(y.text)));
+  });
+  const busyAway = fx.sessions.find((x) => x.status === 'busy' && x.away);
+  assert.strictEqual(bandeja.awayLine(busyAway), '');
+});

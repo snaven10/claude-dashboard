@@ -52,7 +52,39 @@
       "ask": null,
       "errors": null,
       "branch": null,
-      "plan": null
+      "plan": null,
+      "away": {
+        "text": "Esto no debe verse: la sesión está busy.",
+        "at": 1791474912278
+      },
+      "prs": [
+        {
+          "number": 85,
+          "url": "https://gitlab.ejemplo/grupo/demo-api/-/merge_requests/85",
+          "repo": "grupo/demo-api"
+        },
+        {
+          "number": 87,
+          "url": "https://gitlab.ejemplo/grupo/demo-api/-/merge_requests/87",
+          "repo": "grupo/demo-api"
+        }
+      ],
+      "artifacts": [
+        {
+          "title": "Plan de pruebas",
+          "url": "https://claude.ai/artifact/abc"
+        }
+      ],
+      "lines": {
+        "added": 412,
+        "removed": 96
+      },
+      "permissionMode": "auto",
+      "subagents": {
+        "active": 2,
+        "total": 7
+      },
+      "turnStartedAt": 1791474192278
     },
     {
       "id": "b2c3d4e5",
@@ -94,7 +126,29 @@
       "ask": null,
       "errors": null,
       "branch": null,
-      "plan": null
+      "plan": null,
+      "away": {
+        "text": "Terminé la migración de los 3 endpoints de reportes y los tests pasan. Falta decidir si mergeo ahora o después de tu revisión.",
+        "at": 1791475512278
+      },
+      "prs": [
+        {
+          "number": 91,
+          "url": "https://gitlab.ejemplo/grupo/demo-web/-/merge_requests/91",
+          "repo": "grupo/demo-web"
+        }
+      ],
+      "artifacts": [],
+      "lines": {
+        "added": 38,
+        "removed": 7
+      },
+      "permissionMode": "acceptEdits",
+      "subagents": {
+        "active": 1,
+        "total": 1
+      },
+      "turnStartedAt": null
     },
     {
       "id": "c3d4e5f6",
@@ -130,7 +184,17 @@
       "ask": null,
       "errors": null,
       "branch": null,
-      "plan": null
+      "plan": null,
+      "away": {
+        "text": "## Encontré el bug: el offset se calculaba con la página base 1. **Corregido**; falta correr el build.",
+        "at": 1791440712278
+      },
+      "prs": [],
+      "artifacts": [],
+      "lines": null,
+      "permissionMode": "plan",
+      "subagents": null,
+      "turnStartedAt": null
     },
     {
       "id": "d4e5f6a7",
@@ -160,7 +224,29 @@
       "ask": null,
       "errors": null,
       "branch": null,
-      "plan": null
+      "plan": null,
+      "away": {
+        "text": "Revisé las alertas: eran duplicados de un job reprogramado. Abrí un PR que deduplica por id de ejecución.",
+        "at": 1791471312278
+      },
+      "prs": [],
+      "artifacts": [
+        {
+          "title": "Resumen de la revisión",
+          "url": "https://claude.ai/artifact/def"
+        },
+        {
+          "title": "Artifact hostil",
+          "url": "javascript:alert(7)"
+        }
+      ],
+      "lines": {
+        "added": 0,
+        "removed": 0
+      },
+      "permissionMode": null,
+      "subagents": null,
+      "turnStartedAt": null
     },
     {
       "id": "e5f6a7b8",
@@ -202,7 +288,14 @@
       "ask": null,
       "errors": null,
       "branch": null,
-      "plan": null
+      "plan": null,
+      "away": null,
+      "prs": [],
+      "artifacts": [],
+      "lines": null,
+      "permissionMode": null,
+      "subagents": null,
+      "turnStartedAt": null
     },
     {
       "id": "f6a7b8c9",
@@ -255,7 +348,17 @@
       "ask": null,
       "errors": null,
       "branch": null,
-      "plan": null
+      "plan": null,
+      "away": null,
+      "prs": [],
+      "artifacts": [],
+      "lines": null,
+      "permissionMode": "default",
+      "subagents": {
+        "active": 0,
+        "total": 3
+      },
+      "turnStartedAt": 1791476412278
     },
     {
       "id": "a7b8c9d0",
@@ -303,7 +406,14 @@
       "ask": null,
       "errors": null,
       "branch": null,
-      "plan": null
+      "plan": null,
+      "away": null,
+      "prs": [],
+      "artifacts": [],
+      "lines": null,
+      "permissionMode": null,
+      "subagents": null,
+      "turnStartedAt": null
     },
     {
       "id": "b8c9d0e1",
@@ -336,7 +446,14 @@
       "ask": null,
       "errors": null,
       "branch": null,
-      "plan": null
+      "plan": null,
+      "away": null,
+      "prs": [],
+      "artifacts": [],
+      "lines": null,
+      "permissionMode": null,
+      "subagents": null,
+      "turnStartedAt": null
     },
     {
       "id": "f0000001",
@@ -384,7 +501,14 @@
         "pending": 6,
         "skipped": 2,
         "unknown": 0
-      }
+      },
+      "away": null,
+      "prs": [],
+      "artifacts": [],
+      "lines": null,
+      "permissionMode": null,
+      "subagents": null,
+      "turnStartedAt": null
     },
     {
       "id": "f0000002",
@@ -432,7 +556,14 @@
         "pending": 6,
         "skipped": 2,
         "unknown": 0
-      }
+      },
+      "away": null,
+      "prs": [],
+      "artifacts": [],
+      "lines": null,
+      "permissionMode": null,
+      "subagents": null,
+      "turnStartedAt": null
     },
     {
       "id": "f0000003",
@@ -463,7 +594,14 @@
       },
       "errors": null,
       "branch": null,
-      "plan": null
+      "plan": null,
+      "away": null,
+      "prs": [],
+      "artifacts": [],
+      "lines": null,
+      "permissionMode": null,
+      "subagents": null,
+      "turnStartedAt": null
     },
     {
       "id": "f0000004",
@@ -494,7 +632,14 @@
       },
       "errors": null,
       "branch": null,
-      "plan": null
+      "plan": null,
+      "away": null,
+      "prs": [],
+      "artifacts": [],
+      "lines": null,
+      "permissionMode": null,
+      "subagents": null,
+      "turnStartedAt": null
     },
     {
       "id": "f0000005",
@@ -525,7 +670,17 @@
       },
       "errors": null,
       "branch": null,
-      "plan": null
+      "plan": null,
+      "away": {
+        "text": "Away de una sesión busy: no se muestra.",
+        "at": 1791476652278
+      },
+      "prs": [],
+      "artifacts": [],
+      "lines": null,
+      "permissionMode": "bypassPermissions",
+      "subagents": null,
+      "turnStartedAt": 1791475752278
     },
     {
       "id": "f0000006",
@@ -557,7 +712,14 @@
         "high": true
       },
       "branch": null,
-      "plan": null
+      "plan": null,
+      "away": null,
+      "prs": [],
+      "artifacts": [],
+      "lines": null,
+      "permissionMode": null,
+      "subagents": null,
+      "turnStartedAt": null
     },
     {
       "id": "f0000007",
@@ -589,7 +751,14 @@
         "high": false
       },
       "branch": null,
-      "plan": null
+      "plan": null,
+      "away": null,
+      "prs": [],
+      "artifacts": [],
+      "lines": null,
+      "permissionMode": null,
+      "subagents": null,
+      "turnStartedAt": null
     },
     {
       "id": "f0000008",
@@ -628,7 +797,14 @@
         "pending": 0,
         "skipped": 0,
         "unknown": 0
-      }
+      },
+      "away": null,
+      "prs": [],
+      "artifacts": [],
+      "lines": null,
+      "permissionMode": null,
+      "subagents": null,
+      "turnStartedAt": null
     },
     {
       "id": "f0000009",
@@ -655,7 +831,14 @@
       "ask": null,
       "errors": null,
       "branch": "feature/plan-042-una-rama-absurdamente-larga-que-no-entra-en-la-tarjeta-de-360px-sin-truncarse-0123456789",
-      "plan": null
+      "plan": null,
+      "away": null,
+      "prs": [],
+      "artifacts": [],
+      "lines": null,
+      "permissionMode": null,
+      "subagents": null,
+      "turnStartedAt": null
     },
     {
       "id": "f0000010",
@@ -697,7 +880,36 @@
         "pending": 6,
         "skipped": 2,
         "unknown": 0
-      }
+      },
+      "away": {
+        "text": "<img src=x onerror=alert(5)> <script>alert(6)</script>",
+        "at": 1791476112278
+      },
+      "prs": [
+        {
+          "number": 66,
+          "url": "javascript:alert(1)",
+          "repo": "<img src=x onerror=alert(8)>"
+        },
+        {
+          "number": 67,
+          "url": "https://x.test/a b",
+          "repo": "grupo/hostil"
+        }
+      ],
+      "artifacts": [
+        {
+          "title": "<b>x</b>",
+          "url": "https://evil.example/claude.ai/"
+        }
+      ],
+      "lines": null,
+      "permissionMode": "<img src=x>",
+      "subagents": {
+        "active": 3,
+        "total": 3
+      },
+      "turnStartedAt": null
     },
     {
       "id": "aba00001",
@@ -724,7 +936,14 @@
       "waitingFor": "input needed",
       "startedAt": 1783700712278,
       "lastActivityAt": null,
-      "title": "Respaldo nocturno de la base"
+      "title": "Respaldo nocturno de la base",
+      "away": null,
+      "prs": [],
+      "artifacts": [],
+      "lines": null,
+      "permissionMode": null,
+      "subagents": null,
+      "turnStartedAt": null
     },
     {
       "id": "aba00002",
@@ -758,7 +977,14 @@
       "waitingFor": "input needed",
       "startedAt": 1791131112278,
       "lastActivityAt": 1791217512278,
-      "title": "Sincronizar catálogo legado"
+      "title": "Sincronizar catálogo legado",
+      "away": null,
+      "prs": [],
+      "artifacts": [],
+      "lines": null,
+      "permissionMode": null,
+      "subagents": null,
+      "turnStartedAt": null
     }
   ]
 }
