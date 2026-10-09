@@ -15,9 +15,9 @@
       <span id="conn" class="conn conn-off" role="status" aria-live="polite">conectando…</span>
     </div>
     <div class="counters" aria-label="Resumen">
-      <span class="counter c-waiting"><b id="n-waiting">0</b> esperándote</span>
-      <span class="counter c-busy"><b id="n-busy">0</b> trabajando</span>
-      <span class="counter c-idle"><b id="n-idle">0</b> idle</span>
+      <button type="button" id="c-waiting" class="counter c-waiting" aria-pressed="false" title="Filtrar por este estado"><b id="n-waiting">0</b> esperándote</button>
+      <button type="button" id="c-busy" class="counter c-busy" aria-pressed="false" title="Filtrar por este estado"><b id="n-busy">0</b> trabajando</button>
+      <button type="button" id="c-idle" class="counter c-idle" aria-pressed="false" title="Filtrar por este estado"><b id="n-idle">0</b> idle</button>
     </div>
     <div class="filters">
       <label>Proyecto
