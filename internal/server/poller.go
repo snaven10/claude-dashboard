@@ -34,7 +34,7 @@ func (s *Server) build(ctx context.Context) ([]agents.Session, error) {
 	}
 	jobs := s.loadOrq()
 	now := s.now()
-	if s.Summary == nil && s.Usage == nil && s.Activity == nil {
+	if s.Summary == nil && s.Usage == nil && s.Activity == nil && s.Errors == nil {
 		for i := range sessions {
 			s.enrich(&sessions[i], jobs, now)
 		}
@@ -69,6 +69,17 @@ func (s *Server) build(ctx context.Context) ([]agents.Session, error) {
 					s.logf("actividad %s: %v", ss.SessionID, err)
 				} else {
 					s.applyActivity(ss, c, r)
+				}
+			}
+			// Errores de la ventana de 10 min: misma pasada incremental.
+			if s.Errors != nil {
+				if e, err := s.Errors(ss.Cwd, ss.SessionID, now); err != nil {
+					s.logf("errores %s: %v", ss.SessionID, err)
+				} else if e != nil {
+					ss.Errors = &agents.Errors{
+						WindowMin: e.WindowMin, Count: e.Count, LastAt: e.LastAt,
+						High: s.ErrorsWarn > 0 && e.Count >= s.ErrorsWarn,
+					}
 				}
 			}
 		}(&sessions[i])
@@ -136,6 +147,9 @@ func (s *Server) applyActivity(ss *agents.Session, c *transcript.Context, r *tra
 func applyDetail(ss *agents.Session, d transcript.Detail) {
 	ss.Title = d.Title
 	ss.LastPrompt = d.LastPrompt
+	if d.Ask != nil {
+		ss.Ask = &agents.Ask{Kind: d.Ask.Kind, Text: d.Ask.Text, More: d.Ask.More}
+	}
 	if d.LastAction != nil {
 		ss.LastAction = &agents.LastAction{Kind: d.LastAction.Kind, Text: d.LastAction.Text}
 	}

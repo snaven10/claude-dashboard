@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -45,6 +46,21 @@ type usageState struct {
 	lastCompactAt int64 // ms; 0 = nunca
 	lastPreTokens int64
 	recent        []rateEntry // mensajes únicos de los últimos 10 min (respecto del más nuevo)
+
+	// PLAN-005 (DD-22): timestamps (ms) de tool_result con is_error, últimos 10 min
+	// respecto del más nuevo. Rechazos del usuario e interrupciones no entran.
+	errTimes []int64
+}
+
+// errWindowMin es la ventana de errores, en minutos (DD-22).
+const errWindowMin = 10
+
+// ErrorStats son los errores de herramientas de la ventana de 10 min (DD-22).
+// El umbral `high` lo aplica el server.
+type ErrorStats struct {
+	WindowMin int
+	Count     int
+	LastAt    int64 // ms epoch del último error dentro de la ventana
 }
 
 // rateEntry es el output de un mensaje del asistente con su timestamp (ms).
@@ -79,6 +95,7 @@ type usageResult struct {
 	tokens  *Tokens
 	context *Context
 	rate    *Rate
+	errors  *ErrorStats
 }
 
 var (
@@ -105,9 +122,10 @@ type usageLine struct {
 		PreTokens int64 `json:"preTokens"`
 	} `json:"compactMetadata"`
 	Message struct {
-		ID    string `json:"id"`
-		Model string `json:"model"`
-		Usage *struct {
+		Content json.RawMessage `json:"content"`
+		ID      string          `json:"id"`
+		Model   string          `json:"model"`
+		Usage   *struct {
 			Input         int64 `json:"input_tokens"`
 			Output        int64 `json:"output_tokens"`
 			CacheRead     int64 `json:"cache_read_input_tokens"`
@@ -160,6 +178,28 @@ func Activity(cwd, sessionID string, now time.Time) (*Context, *Rate, error) {
 	return r.context, r.rate, nil
 }
 
+// Errors devuelve los errores de herramientas de los últimos 10 min (DD-22) en
+// la MISMA pasada incremental que Usage y Activity. nil si no hay transcript o
+// no hubo errores en la ventana. `now` es inyectable.
+func Errors(cwd, sessionID string, now time.Time) (*ErrorStats, error) {
+	root, err := projectsRoot()
+	if err != nil {
+		return nil, err
+	}
+	path := findPath(root, cwd, sessionID)
+	if path == "" {
+		return nil, nil
+	}
+	r, err := scan(path, now)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("errores de %s: %w", path, err)
+	}
+	return r.errors, nil
+}
+
 func scan(path string, now time.Time) (*usageResult, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -179,6 +219,7 @@ func scan(path string, now time.Time) (*usageResult, error) {
 	if size < st.offset { // truncado o rotado
 		st.offset, st.totals, st.lastMessageID, st.counted = 0, Tokens{}, "", false
 		st.lastContext, st.compactions, st.lastCompactAt, st.lastPreTokens, st.recent = 0, 0, 0, 0, nil
+		st.errTimes = nil
 	}
 	if size > st.offset {
 		first := st.offset == 0
@@ -222,6 +263,21 @@ func scan(path string, now time.Time) (*usageResult, error) {
 // result arma la vista; st.mu tiene que estar tomado.
 func (st *usageState) result(now time.Time) *usageResult {
 	res := &usageResult{}
+	// errores: independientes de que haya mensajes con usage
+	{
+		from := now.Add(-errWindowMin * time.Minute).UnixMilli()
+		to := now.UnixMilli()
+		e := &ErrorStats{WindowMin: errWindowMin}
+		for _, at := range st.errTimes {
+			if at > from && at <= to {
+				e.Count++
+				e.LastAt = max(e.LastAt, at)
+			}
+		}
+		if e.Count > 0 {
+			res.errors = e
+		}
+	}
 	if !st.counted {
 		return res
 	}
@@ -269,6 +325,77 @@ func (st *usageState) pruneRecent() {
 	}
 }
 
+// pruneErrors descarta errores más de 10 min detrás del más nuevo.
+func (st *usageState) pruneErrors() {
+	var newest int64
+	for _, at := range st.errTimes {
+		newest = max(newest, at)
+	}
+	cut := newest - errWindowMin*time.Minute.Milliseconds()
+	i := 0
+	for i < len(st.errTimes) && st.errTimes[i] < cut {
+		i++
+	}
+	if i > 0 {
+		st.errTimes = append([]int64(nil), st.errTimes[i:]...)
+	}
+}
+
+// Prefijos de tool_result con is_error que NO son fallos de la sesión (DD-22).
+var notRealErrors = []string{"The user doesn't want to proceed", "[Request interrupted"}
+
+// countToolErrors cuenta los tool_result con is_error "de verdad" de una línea user.
+func countToolErrors(content json.RawMessage) int {
+	var blocks []struct {
+		Type    string          `json:"type"`
+		IsError bool            `json:"is_error"`
+		Content json.RawMessage `json:"content"`
+	}
+	if json.Unmarshal(content, &blocks) != nil {
+		return 0
+	}
+	n := 0
+	for _, b := range blocks {
+		if b.Type != "tool_result" || !b.IsError {
+			continue
+		}
+		text := toolResultText(b.Content)
+		counts := true
+		for _, p := range notRealErrors {
+			if strings.HasPrefix(text, p) {
+				counts = false
+			}
+		}
+		if counts {
+			n++
+		}
+	}
+	return n
+}
+
+// toolResultText devuelve el contenido de un tool_result, sea string o lista de bloques de texto.
+func toolResultText(c json.RawMessage) string {
+	var s string
+	if json.Unmarshal(c, &s) == nil {
+		return strings.TrimSpace(s)
+	}
+	var parts []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if json.Unmarshal(c, &parts) != nil {
+		return ""
+	}
+	for _, p := range parts {
+		if p.Type == "text" {
+			if t := strings.TrimSpace(p.Text); t != "" {
+				return t
+			}
+		}
+	}
+	return ""
+}
+
 func parseTS(s string) int64 {
 	if s == "" {
 		return 0
@@ -298,6 +425,15 @@ func (st *usageState) consume(data []byte) {
 			st.lastPreTokens = l.CompactMetadata.PreTokens
 			if at := parseTS(l.Timestamp); at > 0 {
 				st.lastCompactAt = at
+			}
+			continue
+		}
+		if l.Type == "user" && bytes.Contains(raw, []byte(`"is_error"`)) {
+			if at := parseTS(l.Timestamp); at > 0 {
+				for n := countToolErrors(l.Message.Content); n > 0; n-- {
+					st.errTimes = append(st.errTimes, at)
+				}
+				st.pruneErrors()
 			}
 			continue
 		}
