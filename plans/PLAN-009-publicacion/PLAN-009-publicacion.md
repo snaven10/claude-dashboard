@@ -11,15 +11,13 @@ nombres del cliente del usuario en datos de prueba, comentarios y planes, y en t
 Este plan limpia el árbol, agrega licencia, reescribe el historial y publica.
 
 ## 2. Hallazgos (verificados 2026-10-09)
-- **El código no necesita archivo de config**: no hay nada del usuario en la lógica. Lo que hay:
-  - Comentarios: `internal/plans/plans.go:149`, `internal/plans/plans_test.go:286` ("layout MI-EMPRESA").
-  - Datos de prueba: `web/fixture-history.json` (`"name": "mi-empresa"` ×23), `web/app.test.js:281`
-    (`PLAN-042-calidad`), ramas `plan-042-*` en fixtures/tests.
-  - Planes: PLAN-001, 002, 005, 006 (rutas `/home/usuario/mi-empresa`, nombre real de un plan del
-    cliente, `web-frontend`, `remota`).
-  - Agente: `.claude/agents/claude-dashboard-worker.md` ("datos de MI-EMPRESA").
-- **Historial:** 44 líneas con el nombre del cliente en `git log --all -p`; además `PLAN-042-*`.
-- **Autor de los 102 commits:** `snaven10 <funes@samuelfunes.com>`.
+- **El código no necesita archivo de config**: no hay nada del usuario en la lógica. Lo privado
+  estaba en dos comentarios de `internal/plans/`, en los datos de prueba (`web/fixture*.json`,
+  `web/app.test.js`, `internal/plans/plans_test.go`: nombre del workspace del cliente y número de
+  un plan real), en cuatro planes (rutas del HOME, nombres de repos y planes del cliente, la otra
+  máquina del usuario) y en el agente del repo.
+- **Historial:** ~44 líneas con el nombre del cliente en `git log --all -p`, más el plan real.
+- **Autor de los commits:** el usuario, con su correo propio (decisión: se publica tal cual).
 - Los SHAs citados en `plans/` quedan viejos tras reescribir (PLAN-002 de orq, DD-5).
 
 ## 3. Tasks y orden
