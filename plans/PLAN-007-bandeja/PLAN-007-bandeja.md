@@ -1,7 +1,7 @@
 # PLAN-007 — Interfaz tipo bandeja: te esperan, lista compacta, detalle y abandonadas
 
 **Fecha:** 2026-10-09
-**Fase:** Aprobado — en ejecución
+**Fase:** Cerrado
 **Proyectos:** claude-dashboard (`~/personal/claude-dashboard`)
 **Origen:** auditoría de la interfaz con datos reales + maqueta aprobada por el usuario ("se ve bien podes seguir")
 **Referencia visual:** [`maqueta.html`](./maqueta.html) (datos de ejemplo; también publicada como artifact privado)
@@ -62,3 +62,12 @@ busca. Nada se dispara mientras el foco está en un input. Indicación visible e
 - Borrar o archivar sesiones.
 
 ## 4. Cierre
+- **Cerrado:** 2026-10-09
+- **Shipeó:** rama `main`, merge junto con TASK-018 (PLAN-008) tras la QA. TASK-017 `724f458` + arreglos de QA. Servicio reinstalado.
+- **Verificación:**
+  - `node --test web/` 45 pass; `go test -race ./...` en verde; código de `main` idéntico a la rama de integración que pasó QA.
+  - Con 40 sesiones reales: contador **0 esperándote** (antes 5: las 5 "esperando" tenían más de 24 h sin actividad → abandonadas, colapsadas, nada se borró); **12 filas visibles a 900 px de alto** (antes 4 tarjetas); `j` mueve la selección y el detalle sigue; sin scroll horizontal en claro 1440 y oscuro 360; en teléfono, fila → detalle con "← volver".
+  - **Bugs que la QA atrapó:** markdown en medio del texto (`## …` llega en una sola línea porque el backend ya junta las líneas; `**…**` en la última acción de texto), comandos de la línea de tiempo en 3+ líneas, franja vacía ocupando una fila.
+- **Desvío:** el criterio pedía ≥ 15 filas a 1280 px; entran 12 a 900 px de alto porque cada fila tiene dos líneas (título + contexto). Se prefirió mantener la segunda línea antes que achicar el texto. El encabezado ya no es sticky (el detalle sticky lo necesita libre).
+- **NO verificado:** la franja "Te esperan" con una sesión real esperando (hoy no había ninguna no abandonada; probada con el fixture); avisos de Windows con la interfaz nueva.
+- **Continúa en:** PLAN-008 (TASK-019 pone los datos nuevos en esta bandeja).
