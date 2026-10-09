@@ -354,3 +354,24 @@ button.counter[aria-pressed="true"] { background: var(--idle-bg); border-color: 
 .progress { height: 8px; border-radius: 999px; background: var(--idle-bg); overflow: hidden; margin: 0 0 10px; }
 .progress-fill { height: 100%; background: var(--done); }
 .group-head { overflow-wrap: anywhere; }
+
+/* ---- PLAN-006: historial ---- */
+.hist-chart { display: flex; align-items: stretch; gap: 2px; height: 120px; border-bottom: 1px solid var(--border); }
+.hist-bar {
+  flex: 1 1 0; min-width: 0; padding: 0; margin: 0; border: 0; background: transparent;
+  display: flex; align-items: flex-end; cursor: pointer; border-radius: 2px 2px 0 0;
+}
+.hist-fill { display: block; width: 100%; background: var(--muted); border-radius: 2px 2px 0 0; }
+.hist-bar:hover .hist-fill, .hist-bar:focus-visible .hist-fill { opacity: 0.75; }
+.hist-bar.today { border-bottom: 3px solid var(--fg); }
+.hist-bar.selected { background: var(--border); }
+.hist-bar.selected .hist-fill { background: var(--fg); }
+.hist-bar:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+.hist-totals { font-size: 0.85rem; overflow-wrap: anywhere; }
+.hist-tables { display: flex; flex-wrap: wrap; gap: 12px; }
+.hist-table { flex: 1 1 260px; min-width: 0; }
+.hist-table h3 { margin: 0 0 4px; font-size: 0.9rem; }
+.hist-table table { width: 100%; border-collapse: collapse; font-size: 0.8rem; table-layout: fixed; }
+.hist-table th, .hist-table td { text-align: left; padding: 2px 4px; border-bottom: 1px solid var(--border); }
+.hist-table td.num, .hist-table th:not(:first-child) { text-align: right; }
+.hist-name { overflow-wrap: anywhere; }

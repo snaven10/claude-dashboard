@@ -30,12 +30,22 @@
         <input type="search" id="f-search" placeholder="/ para buscar" autocomplete="off" spellcheck="false">
       </label>
       <button type="button" id="btn-notify" aria-pressed="false">activar avisos</button>
+      <button type="button" id="btn-history">📊 historial</button>
     </div>
   </header>
   <main>
     <p id="empty" class="empty" hidden>No hay sesiones para mostrar.</p>
     <section id="grid" class="grid" aria-label="Sesiones"></section>
   </main>
+  <div id="history" class="overlay" hidden>
+    <div class="panel" role="dialog" aria-modal="true" aria-labelledby="history-title">
+      <div class="panel-head">
+        <h2 id="history-title">Historial de tokens (30 días)</h2>
+        <button type="button" id="history-close" aria-label="Cerrar (Esc)">✕</button>
+      </div>
+      <div id="history-body" class="panel-body"></div>
+    </div>
+  </div>
   <div id="timeline" class="overlay" hidden>
     <div class="panel" role="dialog" aria-modal="true" aria-labelledby="timeline-title">
       <div class="panel-head">
