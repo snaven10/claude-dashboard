@@ -1,7 +1,7 @@
 # PLAN-004 — Abrir una sesión en el teléfono (QR de Remote Control)
 
 **Fecha:** 2026-10-08
-**Fase:** 2 (Execution) — aprobado por el usuario
+**Fase:** Cerrado
 **Proyectos:** claude-dashboard (`~/personal/claude-dashboard`)
 **Origen:** pedido del usuario: un comando o un QR para abrir la sesión desde el teléfono
 
@@ -25,7 +25,7 @@ el teléfono desde el panel. Ahora: botón "📱 abrir en el teléfono" con QR y
 ## 3. Tasks y orden
 | Task | Qué | Especialista | Modelo | Depende de | Estado |
 |------|-----|--------------|--------|------------|--------|
-| **TASK-010** | `remoteUrl` validado + botón con QR (canvas) + indicación `/remote-control` + aviso en copiar | claude-dashboard-worker | sonnet | — | `pending` |
+| **TASK-010** | `remoteUrl` validado + botón con QR (canvas) + indicación `/remote-control` + aviso en copiar | claude-dashboard-worker | sonnet | — | `done` |
 
 ### Paralelismo
 
@@ -58,4 +58,9 @@ Nada sale de la máquina para dibujar el QR.
 - Activar Remote Control desde el panel (solo lectura) o tocar `remoteControlAtStartup`.
 
 ## 5. Cierre
-<!-- SE LLENA AL CERRAR EL PLAN -->
+- **Cerrado:** 2026-10-08
+- **Shipeó:** rama `main` (sin remoto), merge de TASK-010. Servicio reinstalado.
+- **Verificación:** `go test -race` y 21 tests de node en `main`. QR de una sesión real decodificado con un decodificador independiente (jsQR) = su link exacto. 26/26 ids reales aceptados por DD-18. Casos de DD-20 vistos en el navegador. Sin bugs en la QA.
+- **NO verificado:** escanear el QR con un teléfono real (lo hace el usuario); `/remote-control` en sesiones `--bg` (no documentado, por eso el panel no lo ofrece).
+- **Quedó afuera:** lo de §4.
+- **Continúa en:** —
