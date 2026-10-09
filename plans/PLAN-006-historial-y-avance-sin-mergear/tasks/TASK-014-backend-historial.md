@@ -4,7 +4,7 @@
 - **Especialista:** claude-dashboard-worker
 - **Proyecto:** claude-dashboard (`~/personal/claude-dashboard`), rama `main`
 - **Depende de:** contrato §4 del master
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -26,17 +26,25 @@
 - **Modificar:** `internal/agents/agents.go` (exportar `ProjectName`), `internal/server/server.go`, `internal/server/server_test.go`, `cmd/claude-dashboard/main.go` (arranque del escáner, flag `-history-interval 60s`, `0` lo desactiva), `README.md`
 
 ## Pasos
-- [ ] **Paso 1** — Escáner incremental por archivo con aporte por archivo (para poder restar al achicarse o desaparecer) y agregación por (día local, modelo, proyecto, sessionId).
-- [ ] **Paso 2** — `Result(now)`: 30 días terminando hoy con ceros, top-5 + `"otros"`, `sessions` distintos.
-- [ ] **Paso 3** — Goroutine (primer escaneo en segundo plano, después cada intervalo) y `GET /api/history` con `ready`. Log del tiempo del primer escaneo. README.
+- [x] **Paso 1** — Escáner incremental por archivo con aporte por archivo (para poder restar al achicarse o desaparecer) y agregación por (día local, modelo, proyecto, sessionId).
+- [x] **Paso 2** — `Result(now)`: 30 días terminando hoy con ceros, top-5 + `"otros"`, `sessions` distintos.
+- [x] **Paso 3** — Goroutine (primer escaneo en segundo plano, después cada intervalo) y `GET /api/history` con `ready`. Log del tiempo del primer escaneo. README.
 
 ## Criterios de aceptación
-- [ ] Test: dedup por `message.id` consecutivo; subagente suma al día y cuenta la sesión padre (no una sesión nueva).
-- [ ] Test: día local con zona UTC-6 (`03:00Z` del 9 → día 8); 30 entradas con ceros y orden ascendente.
-- [ ] Test: top-5 + `"otros"` con 7 modelos; la suma de las filas = total del día.
-- [ ] Test: incremental (2º escaneo sin cambios lee 0 bytes); archivo truncado y archivo borrado restan su aporte.
-- [ ] Test en el server: `ready:false` antes del primer escaneo y `true` después; la request no dispara un escaneo.
-- [ ] `gofmt -l .` vacío, `go vet ./...`, `go test -race ./...` en verde y pegados en `Verificado por`.
+- [x] Test: dedup por `message.id` consecutivo; subagente suma al día y cuenta la sesión padre (no una sesión nueva).
+- [x] Test: día local con zona UTC-6 (`03:00Z` del 9 → día 8); 30 entradas con ceros y orden ascendente.
+- [x] Test: top-5 + `"otros"` con 7 modelos; la suma de las filas = total del día.
+- [x] Test: incremental (2º escaneo sin cambios lee 0 bytes); archivo truncado y archivo borrado restan su aporte.
+- [x] Test en el server: `ready:false` antes del primer escaneo y `true` después; la request no dispara un escaneo.
+- [x] `gofmt -l .` vacío, `go vet ./...`, `go test -race ./...` en verde y pegados en `Verificado por`.
 
 ## Resultado
-<!-- SE LLENA AL CERRAR (estado done/skipped). Vacío mientras esté pending. -->
+- **Estado:** done
+- **Commits:** 44d36d7 (implementación); el de `docs(plan)` con este cierre va justo después en la misma rama.
+- **Archivos creados:** `internal/history/history.go`, `internal/history/history_test.go`
+- **Archivos modificados:** `internal/agents/agents.go` (`ProjectName` exportado; `projectName` queda como wrapper para no tocar sus tests), `internal/server/server.go` (campo `History`, ruta `GET /api/history`), `internal/server/server_test.go`, `cmd/claude-dashboard/main.go` (flag `-history-interval 60s`, `0` desactiva; escáner en goroutine), `README.md`
+- **Criterios:** todos cubiertos por tests corridos (dedup + subagente, día local UTC-6 + 30 entradas ascendentes, top-5 + "otros" con 7 modelos, incremental/truncado/borrado, server `ready:false`→`true` sin escanear en la request).
+- **Verificado por:** `gofmt -l .` vacío; `go vet ./...` sin salida; `go test -race ./...` → ok en agents, history, orq, plans, server, transcript.
+- **Desvíos:** ninguno respecto del design. Decisiones: el escáner publica un agregado inmutable al terminar cada pasada (Result no bloquea durante el primer escaneo); modelo/proyecto ausentes se agrupan como `"desconocido"`; con `-history-interval 0` no hay escáner y `ready` queda en `false`.
+- **No verificado:** rendimiento contra los ~1,6 GB reales (el prototipo del plan midió 7,8 s); no levanté el server contra sesiones reales.
+- **Gotchas:** una línea final sin `\n` no se consume hasta que se completa (offset solo avanza por líneas completas), por eso un 2º escaneo la relee; `server.go`/`main.go`/README se cruzan con TASK-015/016: integra el orquestador.

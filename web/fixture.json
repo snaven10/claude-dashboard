@@ -622,6 +622,7 @@
         "path": "/home/user/demo/plans/PLAN-007-sin-orq",
         "total": 5,
         "done": 5,
+        "unmerged": 2,
         "inProgress": 0,
         "blocked": 0,
         "pending": 0,

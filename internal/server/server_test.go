@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"claude-dashboard/internal/agents"
+	"claude-dashboard/internal/history"
 	"claude-dashboard/internal/orq"
 	"claude-dashboard/internal/transcript"
 )
@@ -47,6 +48,54 @@ func newTestServer(list func(context.Context) ([]agents.Session, error)) *Server
 		Static:    fstest.MapFS{"index.html": {Data: []byte("<html>ok</html>")}},
 		Heartbeat: 50 * time.Millisecond,
 		Logf:      func(string, ...any) {},
+	}
+}
+
+func TestHistoryRouteReadyAndNoScanOnRequest(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "p"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ln := `{"type":"assistant","timestamp":"2026-10-08T15:00:00Z","cwd":"/w/p","message":{"id":"m1","model":"opus","usage":{"output_tokens":9}}}` + "\n"
+	if err := os.WriteFile(filepath.Join(root, "p", "s.jsonl"), []byte(ln), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sc := &history.Scanner{Root: root, Loc: time.UTC, Logf: func(string, ...any) {}}
+	s := newTestServer(func(context.Context) ([]agents.Session, error) { return nil, nil })
+	s.History = sc.Result
+	s.Now = func() time.Time { return time.Date(2026, 10, 8, 18, 0, 0, 0, time.UTC) }
+	ts := httptest.NewServer(s.Handler())
+	defer ts.Close()
+
+	get := func() history.Response {
+		t.Helper()
+		resp, err := http.Get(ts.URL + "/api/history")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var h history.Response
+		if err := json.NewDecoder(resp.Body).Decode(&h); err != nil {
+			t.Fatal(err)
+		}
+		return h
+	}
+	if h := get(); h.Ready || len(h.Days) != 0 {
+		t.Fatalf("antes del escaneo: %+v", h)
+	}
+	if sc.BytesRead() != 0 {
+		t.Fatalf("la request disparó un escaneo (%d bytes)", sc.BytesRead())
+	}
+	if err := sc.Scan(); err != nil {
+		t.Fatal(err)
+	}
+	before := sc.BytesRead()
+	h := get()
+	if !h.Ready || len(h.Days) != 30 || h.Days[29].Output != 9 {
+		t.Fatalf("tras el escaneo: ready=%v días=%d", h.Ready, len(h.Days))
+	}
+	if sc.BytesRead() != before {
+		t.Fatal("la request leyó transcripts")
 	}
 }
 

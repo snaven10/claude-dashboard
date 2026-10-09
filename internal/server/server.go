@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"claude-dashboard/internal/agents"
+	"claude-dashboard/internal/history"
 	"claude-dashboard/internal/orq"
 	"claude-dashboard/internal/transcript"
 )
@@ -41,12 +42,14 @@ type Server struct {
 	RateOutput  int64 // rate.high si output > RateOutput
 	RateCalls   int   // rate.high si calls > RateCalls
 	Orq         func() (map[string]orq.Job, error)
-	StaleAfter  time.Duration // 0 desactiva stale
-	Now         func() time.Time
-	Static      fs.FS
-	Interval    time.Duration
-	Heartbeat   time.Duration
-	Logf        func(format string, args ...any)
+	// History devuelve el último historial calculado (PLAN-006, DD-27); nunca escanea.
+	History    func(now time.Time) history.Response
+	StaleAfter time.Duration // 0 desactiva stale
+	Now        func() time.Time
+	Static     fs.FS
+	Interval   time.Duration
+	Heartbeat  time.Duration
+	Logf       func(format string, args ...any)
 
 	mu       sync.Mutex
 	hash     [32]byte
@@ -107,6 +110,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/sessions", s.handleSessions)
 	mux.HandleFunc("GET /api/events", s.handleEvents)
 	mux.HandleFunc("GET /api/sessions/{sessionId}/timeline", s.handleTimeline)
+	mux.HandleFunc("GET /api/history", s.handleHistory)
 	if s.Static != nil {
 		mux.Handle("/", http.FileServer(http.FS(s.Static)))
 	}
@@ -177,6 +181,21 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 		SessionID string             `json:"sessionId"`
 		Events    []transcript.Event `json:"events"`
 	}{id, events})
+}
+
+// handleHistory sirve el último historial calculado por el escáner aparte.
+func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
+	now := time.Now()
+	if s.Now != nil {
+		now = s.Now()
+	}
+	resp := history.Response{GeneratedAt: now.UnixMilli(), Days: []history.Day{}}
+	if s.History != nil {
+		resp = s.History(now)
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 func writeEvent(w http.ResponseWriter, f http.Flusher, payload []byte) error {

@@ -94,6 +94,7 @@ type Plan struct {
 	Pending    int    `json:"pending"`
 	Skipped    int    `json:"skipped"`
 	Unknown    int    `json:"unknown"`
+	Unmerged   int    `json:"unmerged"`
 }
 
 // Context es el contexto actual y las compactaciones (DD-13). Sin porcentaje: el
@@ -280,6 +281,12 @@ var projectCache sync.Map // cwd -> string
 // su padre; si es archivo "gitdir: …/.git/worktrees/x", repo = lo previo a
 // "/.git/worktrees/". Ante cualquier fallo, basename(cwd).
 func projectName(cwd string) string {
+	return ProjectName(cwd)
+}
+
+// ProjectName es la versión exportada de projectName (con cache), para
+// otros paquetes que agrupan por proyecto (internal/history).
+func ProjectName(cwd string) string {
 	if cwd == "" {
 		return ""
 	}

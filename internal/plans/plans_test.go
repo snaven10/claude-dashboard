@@ -189,3 +189,127 @@ func TestEstadoSameSizeChangeIsReflected(t *testing.T) {
 		t.Fatalf("después: %+v", p)
 	}
 }
+
+// addWorktree registra un worktree sintético en <repo>/.git/worktrees/<name>/gitdir
+// y devuelve su raíz. Si create es false la raíz no existe (worktree borrado).
+func addWorktree(t *testing.T, repo, name string, create bool) string {
+	t.Helper()
+	root := filepath.Join(t.TempDir(), name)
+	if create {
+		if err := os.MkdirAll(root, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(t, filepath.Join(repo, ".git", "worktrees", name, "gitdir"), filepath.Join(root, ".git")+"\n")
+	return root
+}
+
+// setTask escribe la task de un plan bajo base con estado y mtime dados.
+func setTask(t *testing.T, base, plan, file, state string, mtime time.Time) {
+	t.Helper()
+	f := filepath.Join(base, "plans", plan, "tasks", file)
+	write(t, f, "# T\n- **Estado:** `"+state+"`\n")
+	if err := os.Chtimes(f, mtime, mtime); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUnmergedWorktreeWins(t *testing.T) {
+	home := t.TempDir()
+	repo := filepath.Join(home, "r")
+	now := time.Now()
+	setTask(t, repo, "PLAN-005-x", "TASK-001-a.md", "pending", now.Add(-time.Hour))
+	setTask(t, repo, "PLAN-005-x", "TASK-002-b.md", "pending", now.Add(-time.Hour))
+	wt := addWorktree(t, repo, "w1", true)
+	setTask(t, wt, "PLAN-005-x", "TASK-001-a.md", "done", now)
+	p := Find(5, repo, home)
+	if p == nil || p.Total != 2 || p.Done != 1 || p.Pending != 1 || p.Unmerged != 1 {
+		t.Fatalf("got %+v", p)
+	}
+}
+
+func TestUnmergedOlderOrSameStateIgnored(t *testing.T) {
+	home := t.TempDir()
+	repo := filepath.Join(home, "r")
+	now := time.Now()
+	setTask(t, repo, "PLAN-005-x", "TASK-001-a.md", "pending", now)
+	setTask(t, repo, "PLAN-005-x", "TASK-002-b.md", "pending", now.Add(-time.Hour))
+	wt := addWorktree(t, repo, "w1", true)
+	setTask(t, wt, "PLAN-005-x", "TASK-001-a.md", "done", now.Add(-time.Hour)) // más vieja
+	setTask(t, wt, "PLAN-005-x", "TASK-002-b.md", "pending", now)              // mismo estado
+	p := Find(5, repo, home)
+	if p == nil || p.Done != 0 || p.Pending != 2 || p.Unmerged != 0 {
+		t.Fatalf("got %+v", p)
+	}
+}
+
+func TestUnmergedWorktreeOnlyTaskNotCounted(t *testing.T) {
+	home := t.TempDir()
+	repo := filepath.Join(home, "r")
+	now := time.Now()
+	setTask(t, repo, "PLAN-005-x", "TASK-001-a.md", "pending", now.Add(-time.Hour))
+	wt := addWorktree(t, repo, "w1", true)
+	setTask(t, wt, "PLAN-005-x", "TASK-009-solo.md", "done", now)
+	p := Find(5, repo, home)
+	if p == nil || p.Total != 1 || p.Done != 0 || p.Unmerged != 0 {
+		t.Fatalf("got %+v", p)
+	}
+}
+
+func TestUnmergedDeletedWorktreeIgnored(t *testing.T) {
+	home := t.TempDir()
+	repo := filepath.Join(home, "r")
+	setTask(t, repo, "PLAN-005-x", "TASK-001-a.md", "pending", time.Now().Add(-time.Hour))
+	addWorktree(t, repo, "gone", false)
+	write(t, filepath.Join(repo, ".git", "worktrees", "roto", "gitdir"), "")
+	p := Find(5, repo, home)
+	if p == nil || p.Pending != 1 || p.Unmerged != 0 {
+		t.Fatalf("got %+v", p)
+	}
+}
+
+func TestUnmergedNewestWorktreeWins(t *testing.T) {
+	home := t.TempDir()
+	repo := filepath.Join(home, "r")
+	now := time.Now()
+	setTask(t, repo, "PLAN-005-x", "TASK-001-a.md", "pending", now.Add(-time.Hour))
+	w1 := addWorktree(t, repo, "w1", true)
+	w2 := addWorktree(t, repo, "w2", true)
+	setTask(t, w1, "PLAN-005-x", "TASK-001-a.md", "done", now.Add(-time.Minute))
+	setTask(t, w2, "PLAN-005-x", "TASK-001-a.md", "blocked", now)
+	p := Find(5, repo, home)
+	if p == nil || p.Blocked != 1 || p.Done != 0 || p.Unmerged != 1 {
+		t.Fatalf("got %+v", p)
+	}
+}
+
+// Layout MI-EMPRESA: el plan vive en un padre del repo → sin overlay.
+func TestUnmergedPlanInParentNoOverlay(t *testing.T) {
+	home := t.TempDir()
+	parent := filepath.Join(home, "ws")
+	repo := filepath.Join(parent, "front")
+	now := time.Now()
+	setTask(t, parent, "PLAN-005-x", "TASK-001-a.md", "pending", now.Add(-time.Hour))
+	wt := addWorktree(t, repo, "w1", true)
+	setTask(t, wt, "PLAN-005-x", "TASK-001-a.md", "done", now)
+	p := Find(5, repo, home)
+	if p == nil || p.Pending != 1 || p.Done != 0 || p.Unmerged != 0 {
+		t.Fatalf("got %+v", p)
+	}
+}
+
+// El más nuevo gana aunque el glob lo recorra PRIMERO (si no, ganaría el último por orden).
+func TestUnmergedNewestWorktreeWinsRegardlessOfOrder(t *testing.T) {
+	home := t.TempDir()
+	repo := filepath.Join(home, "r")
+	now := time.Now()
+	setTask(t, repo, "PLAN-005-x", "TASK-001-a.md", "pending", now.Add(-time.Hour))
+	w1 := addWorktree(t, repo, "w1", true) // w1 sale primero en el glob y es el más nuevo
+	w2 := addWorktree(t, repo, "w2", true)
+	setTask(t, w1, "PLAN-005-x", "TASK-001-a.md", "blocked", now)
+	setTask(t, w2, "PLAN-005-x", "TASK-001-a.md", "done", now.Add(-time.Minute))
+	p := Find(5, repo, home)
+	if p == nil || p.Blocked != 1 || p.Done != 0 || p.Unmerged != 1 {
+		t.Fatalf("got %+v", p)
+	}
+}
