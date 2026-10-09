@@ -33,6 +33,9 @@ type Server struct {
 	Usage    func(cwd, sessionID string) (*transcript.Tokens, error)
 	Activity func(cwd, sessionID string, now time.Time) (*transcript.Context, *transcript.Rate, error)
 	Timeline func(cwd, sessionID string) ([]transcript.Event, error)
+	Errors   func(cwd, sessionID string, now time.Time) (*transcript.ErrorStats, error)
+	// ErrorsWarn: errors.high si count >= ErrorsWarn (PLAN-005 DD-22); 0 desactiva.
+	ErrorsWarn int
 	// Umbrales de PLAN-003; 0 desactiva el aviso correspondiente.
 	ContextWarn int64 // context.warn si current >= ContextWarn
 	RateOutput  int64 // rate.high si output > RateOutput

@@ -191,3 +191,110 @@ test('app.js no usa los generadores de HTML de la librería ni innerHTML', () =>
   const src = fs.readFileSync(__dirname + '/app.js', 'utf8');
   assert.doesNotMatch(src, /createSvgTag|createImgTag|createTableTag|innerHTML/);
 });
+
+// ---- PLAN-005 ----
+
+test('askView: según estado y kind (DD-25)', () => {
+  const q = { kind: 'question', text: '¿Mergeo?', more: 2 };
+  const w = A.askView({ status: 'waiting', ask: q });
+  assert.deepStrictEqual(w, { mode: 'big', label: 'pregunta:', text: '¿Mergeo?', more: '+2 preguntas' });
+  assert.strictEqual(A.askView({ status: 'blocked', ask: { kind: 'question', text: 'x', more: 1 } }).more, '+1 pregunta');
+  assert.strictEqual(A.askView({ status: 'waiting', ask: { kind: 'question', text: 'x', more: 0 } }).more, '');
+  const t = A.askView({ status: 'waiting', ask: { kind: 'tool', text: 'Bash: git push' } });
+  assert.strictEqual(t.label, 'pide permiso:');
+  assert.strictEqual(t.text, 'Bash: git push');
+  assert.strictEqual(A.askView({ status: 'waiting', ask: { kind: 'text', text: 'hola' } }).label, 'último mensaje:');
+  const i = A.askView({ status: 'idle', ask: { kind: 'text', text: 'hola' } });
+  assert.strictEqual(i.mode, 'small');
+  assert.strictEqual(i.label, 'último mensaje:');
+  assert.strictEqual(A.askView({ status: 'busy', ask: q }), null);
+  assert.strictEqual(A.askView({ status: 'done', ask: q }), null);
+  assert.strictEqual(A.askView({ status: 'waiting', ask: null }), null);
+  assert.strictEqual(A.askView({ status: 'waiting' }), null);
+  assert.strictEqual(A.askView({ status: 'waiting', ask: { kind: 'text', text: '' } }), null);
+});
+
+test('errorsView: insignia solo con high; sin high solo tooltip', () => {
+  assert.strictEqual(A.errorsView(null), null);
+  assert.strictEqual(A.errorsView({ count: 0, high: false }), null);
+  const hi = A.errorsView({ windowMin: 10, count: 6, high: true });
+  assert.strictEqual(hi.badge, '⚠ 6 errores en 10 min');
+  assert.match(hi.title, /6 errores/);
+  const lo = A.errorsView({ windowMin: 10, count: 2, high: false });
+  assert.strictEqual(lo.badge, '');
+  assert.match(lo.title, /2 errores/);
+});
+
+test('groupByPlan: clave plan.path con fallback a orq.plan', () => {
+  const info = { number: 133, name: 'PLAN-042-x', path: '/p/PLAN-042-x', total: 28, done: 14, inProgress: 2, blocked: 4 };
+  const list = [
+    s('a', 'busy', { plan: info, orq: { plan: '133' } }),
+    s('b', 'waiting', { plan: info }),
+    s('c', 'busy', { orq: { plan: '2' } }),
+    s('d', 'idle', { plan: { number: 7, path: '/p/PLAN-007-y', total: 1, done: 1 } }),
+    s('e', 'idle'),
+  ];
+  const g = groupByPlan(list);
+  assert.deepStrictEqual(g.map((x) => x.plan), ['2', '7', '133', null]);
+  assert.deepStrictEqual(g.map((x) => x.sessions.length), [1, 1, 2, 1]);
+  assert.strictEqual(g[2].info, info);
+  assert.strictEqual(g[0].info, null);
+  assert.strictEqual(g[2].waiting, 1);
+  // mismo plan.path con distinto orq.plan: un solo grupo
+  assert.strictEqual(groupByPlan([s('x', 'busy', { plan: info, orq: { plan: '1' } }), s('y', 'busy', { plan: info })]).length, 1);
+});
+
+test('planHeading y planProgress', () => {
+  const g = { plan: '133', info: { total: 28, done: 14, blocked: 4, inProgress: 2 } };
+  assert.strictEqual(A.planHeading(g), 'PLAN-042 · 14/28 done · 4 blocked · 2 in_progress');
+  assert.strictEqual(A.planHeading({ plan: '7', info: { total: 5, done: 5, blocked: 0, inProgress: 0 } }), 'PLAN-7 · 5/5 done');
+  assert.strictEqual(A.planHeading({ plan: '2', info: null }), 'PLAN-2');
+  assert.strictEqual(A.planHeading({ plan: null, info: null }), 'Sin plan');
+  assert.strictEqual(A.planProgress(g.info), 0.5);
+  assert.strictEqual(A.planProgress({ total: 0, done: 0 }), 0);
+  assert.strictEqual(A.planProgress({ total: 2, done: 9 }), 1);
+  assert.strictEqual(A.planProgress(null), 0);
+});
+
+test('faviconLabel: 0 original, 3, 9, 10+ = 9+', () => {
+  assert.strictEqual(A.faviconLabel(0), '');
+  assert.strictEqual(A.faviconLabel(3), '3');
+  assert.strictEqual(A.faviconLabel(9), '9');
+  assert.strictEqual(A.faviconLabel(10), '9+');
+  assert.strictEqual(A.faviconLabel(57), '9+');
+  assert.strictEqual(A.faviconLabel(null), '');
+  assert.strictEqual(A.faviconLabel(-1), '');
+});
+
+test('filtro por estado: toggle y coincidencia (blocked cuenta como waiting)', () => {
+  assert.strictEqual(A.toggleStatusFilter('', 'waiting'), 'waiting');
+  assert.strictEqual(A.toggleStatusFilter('waiting', 'waiting'), '');
+  assert.strictEqual(A.toggleStatusFilter('waiting', 'busy'), 'busy');
+  assert.strictEqual(A.toggleStatusFilter('busy', 'done'), 'busy');
+  assert.strictEqual(A.matchesStatus({ status: 'blocked' }, 'waiting'), true);
+  assert.strictEqual(A.matchesStatus({ status: 'busy' }, 'waiting'), false);
+  assert.strictEqual(A.matchesStatus({ status: 'idle' }, 'idle'), true);
+  assert.strictEqual(A.matchesStatus({ status: 'done' }, ''), true);
+});
+
+test('matchesQuery encuentra por rama y por nombre del plan', () => {
+  const x = { name: 'n', branch: 'feat-plan-042-latido-front', plan: { name: 'PLAN-042-calidad' } };
+  assert.strictEqual(A.matchesQuery(x, 'latido'), true);
+  assert.strictEqual(A.matchesQuery(x, 'FEAT-PLAN'), true);
+  assert.strictEqual(A.matchesQuery(x, 'calidad'), true);
+  assert.strictEqual(A.matchesQuery({ name: 'n', branch: null }, 'latido'), false);
+});
+
+test('fixture PLAN-005: cubre cada caso del contrato', () => {
+  const d = JSON.parse(fs.readFileSync(__dirname + '/fixture.json', 'utf8'));
+  const l = d.sessions;
+  assert.ok(l.some((x) => x.ask && x.ask.kind === 'question' && x.ask.more > 0 && x.status === 'waiting'));
+  assert.ok(l.some((x) => x.ask && x.ask.kind === 'tool' && x.status === 'waiting'));
+  assert.ok(l.some((x) => x.ask && x.ask.kind === 'text' && x.status === 'idle'));
+  assert.ok(l.some((x) => x.errors && x.errors.high));
+  assert.ok(l.some((x) => x.errors && x.errors.count > 0 && !x.errors.high));
+  assert.ok(l.some((x) => x.plan && !x.orq));
+  assert.ok(l.filter((x) => x.plan && x.plan.number === 133).length >= 2);
+  assert.ok(l.some((x) => x.branch && x.branch.length > 80));
+  assert.ok(l.some((x) => x.branch && x.branch.startsWith('<')));
+});

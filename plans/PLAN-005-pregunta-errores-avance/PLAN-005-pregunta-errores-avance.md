@@ -67,8 +67,10 @@ de `Summary`), en orden de prioridad:
 2. Último `tool_use` de otra herramienta SIN `tool_result` posterior → `kind:"tool"`,
    `text` = mismo formato que `lastAction` (`"Bash: git push"`). Si la sesión está `waiting`, la UI
    lo muestra como permiso pedido.
-3. Si el último mensaje con contenido es del asistente y tiene texto → `kind:"text"`, ese texto.
-4. Si el último mensaje real es del usuario (Claude está trabajando) → `null`.
+3. Si no, el último texto del asistente posterior al último prompt real → `kind:"text"`, aunque
+   después haya `tool_result` (**corregido en QA**: un permiso pendiente NO se escribe en el
+   transcript; la sesión `waiting` real terminaba en un `tool_result` y la regla original daba `null`).
+4. Sin texto del asistente desde el último prompt real → `null`.
 `text` truncado a 300 runas. Las líneas inyectadas por el harness se ignoran igual que en `lastPrompt`.
 
 **DD-22 — `errors`: `tool_result` con `is_error:true` en los últimos 10 min.** Se calcula en el

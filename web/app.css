@@ -325,3 +325,32 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 .qr { background: #ffffff; width: min(100%, 320px); height: auto; aspect-ratio: 1; image-rendering: pixelated; border-radius: 4px; }
 .phone-help { margin: 0; font-size: 0.85rem; color: var(--muted); text-align: center; }
 .phone-link { max-width: 100%; overflow-wrap: anywhere; text-align: center; color: var(--busy); font-size: 0.85rem; }
+
+/* ---- PLAN-005 ---- */
+button.counter {
+  font-size: 0.9rem;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: transparent;
+}
+button.counter[aria-pressed="true"] { background: var(--idle-bg); border-color: currentColor; font-weight: 700; }
+.branch {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.badge.errors { align-self: flex-start; color: var(--warn); background: var(--warn-bg); white-space: normal; }
+.ask { display: flex; flex-wrap: wrap; gap: 2px 6px; font-size: 0.85rem; overflow-wrap: anywhere; min-width: 0; }
+.ask-label { font-weight: 600; }
+.ask-text { white-space: pre-wrap; max-height: 12em; overflow: auto; min-width: 0; }
+.ask-big { color: var(--waiting); background: var(--waiting-bg); padding: 6px 8px; border-radius: 6px; font-size: 0.9rem; }
+.ask-small { color: var(--muted); font-size: 0.8rem; }
+.ask-small .ask-text { max-height: 4.5em; }
+.ask-more { font-weight: 600; flex-basis: 100%; }
+.progress { height: 8px; border-radius: 999px; background: var(--idle-bg); overflow: hidden; margin: 0 0 10px; }
+.progress-fill { height: 100%; background: var(--done); }
+.group-head { overflow-wrap: anywhere; }

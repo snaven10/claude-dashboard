@@ -5,11 +5,15 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"os"
+	"regexp"
+	"strconv"
 	"sync"
 	"time"
 
 	"claude-dashboard/internal/agents"
 	"claude-dashboard/internal/orq"
+	"claude-dashboard/internal/plans"
 	"claude-dashboard/internal/transcript"
 )
 
@@ -34,7 +38,7 @@ func (s *Server) build(ctx context.Context) ([]agents.Session, error) {
 	}
 	jobs := s.loadOrq()
 	now := s.now()
-	if s.Summary == nil && s.Usage == nil && s.Activity == nil {
+	if s.Summary == nil && s.Usage == nil && s.Activity == nil && s.Errors == nil {
 		for i := range sessions {
 			s.enrich(&sessions[i], jobs, now)
 		}
@@ -69,6 +73,17 @@ func (s *Server) build(ctx context.Context) ([]agents.Session, error) {
 					s.logf("actividad %s: %v", ss.SessionID, err)
 				} else {
 					s.applyActivity(ss, c, r)
+				}
+			}
+			// Errores de la ventana de 10 min: misma pasada incremental.
+			if s.Errors != nil {
+				if e, err := s.Errors(ss.Cwd, ss.SessionID, now); err != nil {
+					s.logf("errores %s: %v", ss.SessionID, err)
+				} else if e != nil {
+					ss.Errors = &agents.Errors{
+						WindowMin: e.WindowMin, Count: e.Count, LastAt: e.LastAt,
+						High: s.ErrorsWarn > 0 && e.Count >= s.ErrorsWarn,
+					}
 				}
 			}
 		}(&sessions[i])
@@ -111,8 +126,43 @@ func (s *Server) enrich(ss *agents.Session, jobs map[string]orq.Job, now time.Ti
 			ss.Orq = o
 		}
 	}
+	ss.Branch = agents.Branch(ss.Cwd)
+	ss.Plan = findPlan(ss)
 	ss.Stale = s.StaleAfter > 0 && ss.Status == agents.StatusBusy && ss.LastActivityAt > 0 &&
 		now.UnixMilli()-ss.LastActivityAt > s.StaleAfter.Milliseconds()
+}
+
+var branchPlanRe = regexp.MustCompile(`(?i)plan-?(\d+)`)
+
+// planNumber: primero el key de orq (p<N>-task<M>), si no la rama (DD-23).
+func planNumber(ss *agents.Session) int {
+	if ss.Orq != nil && ss.Orq.Plan != nil {
+		if n, err := strconv.Atoi(*ss.Orq.Plan); err == nil && n > 0 {
+			return n
+		}
+	}
+	if ss.Branch != nil {
+		if m := branchPlanRe.FindStringSubmatch(*ss.Branch); m != nil {
+			if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+				return n
+			}
+		}
+	}
+	return 0
+}
+
+// findPlan devuelve el avance del plan de la sesión, o nil sin dato.
+func findPlan(ss *agents.Session) *agents.Plan {
+	n := planNumber(ss)
+	if n == 0 {
+		return nil
+	}
+	root := agents.RepoRoot(ss.Cwd)
+	home, err := os.UserHomeDir()
+	if root == "" || err != nil {
+		return nil
+	}
+	return (*agents.Plan)(plans.Find(n, root, home)) // mismos campos: conversión directa
 }
 
 // applyActivity pasa contexto y ritmo al contrato aplicando los umbrales (DD-13, DD-14).
@@ -136,6 +186,9 @@ func (s *Server) applyActivity(ss *agents.Session, c *transcript.Context, r *tra
 func applyDetail(ss *agents.Session, d transcript.Detail) {
 	ss.Title = d.Title
 	ss.LastPrompt = d.LastPrompt
+	if d.Ask != nil {
+		ss.Ask = &agents.Ask{Kind: d.Ask.Kind, Text: d.Ask.Text, More: d.Ask.More}
+	}
 	if d.LastAction != nil {
 		ss.LastAction = &agents.LastAction{Kind: d.LastAction.Kind, Text: d.LastAction.Text}
 	}
