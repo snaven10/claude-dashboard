@@ -231,7 +231,9 @@ func TestAskDD21(t *testing.T) {
 		{"harness ignorado tras el texto", uPrompt("hacelo") + aText("Terminé") + harness,
 			&Ask{Kind: "text", Text: "Terminé"}},
 		{"abierta de antes del último prompt no cuenta", aTool("t1", "Bash", `{"command":"ls"}`) + uPrompt("otra cosa"), nil},
-		{"texto más viejo que un resultado no cuenta", uPrompt("a") + aText("pensando") + aTool("t1", "Bash", `{"command":"ls"}`) + uResult("t1"), nil},
+		{"texto antes de un resultado cuenta (el permiso pendiente no queda en el transcript)", uPrompt("a") + aText("pensando") + aTool("t1", "Bash", `{"command":"ls"}`) + uResult("t1"),
+			&Ask{Kind: "text", Text: "pensando"}},
+		{"texto de antes del último prompt no cuenta", aText("viejo") + uPrompt("a") + aTool("t1", "Bash", `{"command":"ls"}`) + uResult("t1"), nil},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -223,7 +223,9 @@ type block struct {
 	Input     map[string]json.RawMessage `json:"input"`
 }
 
-// askScan sigue, de atrás hacia adelante, qué quedó abierto (DD-21).
+// askScan sigue, de atrás hacia adelante, qué quedó abierto (DD-21). El texto es
+// el último del asistente desde el último prompt real, aunque después haya
+// tool_results: un permiso pendiente NO queda en el transcript (QA PLAN-005).
 // Yendo hacia atrás el tool_result aparece ANTES que su tool_use, por eso
 // basta con juntar los ids contestados a medida que se avanza.
 type askScan struct {
@@ -231,7 +233,6 @@ type askScan struct {
 	question *Ask
 	tool     *Ask
 	text     *Ask
-	sawUser  bool // ya pasó un mensaje del usuario (resultado o prompt) más nuevo
 	done     bool // llegó a un prompt real: lo anterior no cuenta
 }
 
@@ -255,7 +256,6 @@ func (a *askScan) user(content json.RawMessage) {
 					a.answered = map[string]bool{}
 				}
 				a.answered[b.ToolUseID] = true
-				a.sawUser = true
 			}
 		}
 	}
@@ -288,7 +288,7 @@ func (a *askScan) assistant(content json.RawMessage) {
 				a.tool = &Ask{Kind: "tool", Text: truncate(oneLine(t), maxAsk)}
 			}
 		case "text":
-			if a.text == nil && !a.sawUser {
+			if a.text == nil {
 				if t := oneLine(b.Text); t != "" {
 					a.text = &Ask{Kind: "text", Text: truncate(t, maxAsk)}
 				}
@@ -353,7 +353,7 @@ func parse(data []byte) (Detail, bool) {
 				if text, ok := realUserText(l.Message.Content); ok {
 					d.LastPrompt = truncate(text, maxPrompt)
 					realUser = true
-					ask.done, ask.sawUser = true, true
+					ask.done = true
 				}
 			}
 		case "assistant":
