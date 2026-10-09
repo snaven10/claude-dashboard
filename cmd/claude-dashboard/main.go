@@ -9,10 +9,12 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"claude-dashboard/internal/agents"
+	"claude-dashboard/internal/history"
 	"claude-dashboard/internal/orq"
 	"claude-dashboard/internal/server"
 	"claude-dashboard/internal/transcript"
@@ -35,6 +37,7 @@ func run() error {
 	rateOutput := flag.Int64("rate-output", 20_000, "ritmo inusual si el output de 5 min supera esto (0 lo desactiva)")
 	rateCalls := flag.Int("rate-calls", 25, "ritmo inusual si las llamadas de 5 min superan esto (0 lo desactiva)")
 	errorsWarn := flag.Int("errors-warn", 5, "errors.high si los errores de herramientas de 10 min llegan a esto (0 lo desactiva)")
+	histInterval := flag.Duration("history-interval", 60*time.Second, "período del escáner del historial de tokens (0 lo desactiva)")
 	flag.Parse()
 
 	if *interval <= 0 {
@@ -49,6 +52,9 @@ func run() error {
 	if *errorsWarn < 0 {
 		return fmt.Errorf("-errors-warn no puede ser negativo")
 	}
+	if *histInterval < 0 {
+		return fmt.Errorf("-history-interval no puede ser negativo")
+	}
 	if err := server.ValidateAddr(*addr, *allowRemote); err != nil {
 		return err
 	}
@@ -56,7 +62,18 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	hist := &history.Scanner{ProjectOf: agents.ProjectName}
+	if *histInterval > 0 {
+		if home, err := os.UserHomeDir(); err != nil {
+			log.Printf("history desactivado: %v", err)
+		} else {
+			hist.Root = filepath.Join(home, ".claude", "projects")
+			go hist.Run(ctx.Done(), *histInterval) // en segundo plano: ready:false hasta el primer escaneo
+		}
+	}
+
 	s := &server.Server{
+		History:     hist.Result,
 		List:        agents.List,
 		Summary:     transcript.Summary,
 		Usage:       transcript.Usage,
