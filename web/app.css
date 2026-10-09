@@ -156,6 +156,8 @@ h2 { margin: 0 0 6px; font-size: 0.75rem; text-transform: uppercase; letter-spac
 .ask-q .lbl { font-weight: 700; margin-right: 4px; }
 .ask-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .inbox-empty { color: var(--muted); margin: 0; padding: 4px 0; }
+.inbox.empty { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.inbox.empty h2, .inbox.empty .inbox-empty { margin: 0; padding: 0; }
 .help { color: var(--muted); font-size: 0.75rem; overflow-wrap: anywhere; }
 
 /* ---- lista + detalle ---- */
@@ -277,7 +279,7 @@ h2 { margin: 0 0 6px; font-size: 0.75rem; text-transform: uppercase; letter-spac
 .ev-at, .ev-kind { color: var(--muted); font-size: 0.75rem; }
 .ev-kind { text-transform: uppercase; letter-spacing: 0.03em; }
 .ev-text { flex-basis: 100%; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 8em; overflow: auto; }
-.ev-tool .ev-text { font-family: var(--mono); font-size: 0.8rem; }
+.ev-tool .ev-text { font-family: var(--mono); font-size: 0.8rem; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ev-prompt .ev-text { font-weight: 600; }
 
 .actions { display: flex; flex-wrap: wrap; gap: 6px; }

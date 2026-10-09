@@ -349,6 +349,7 @@
       .replace(/__/g, '')
       .replace(/`/g, '')
       .replace(/\s+/g, ' ')
+      .replace(/(^|\s)#{2,6}\s+/g, '$1') // "## x" en medio: el backend ya juntó las líneas; un "#" suelto no es encabezado
       .trim();
   }
 
@@ -922,6 +923,7 @@
     var items = inboxItems(sessions, now);
     $('inbox-title').textContent = 'Te esperan' + (items.length ? ' (' + items.length + ')' : '');
     var box = $('inbox-items');
+    box.parentNode.classList.toggle('empty', !items.length); // vacía: una sola línea, deja lugar a la lista
     if (!items.length) {
       box.replaceChildren(el('p', 'inbox-empty', 'Nadie te espera.'));
       return;
@@ -1025,7 +1027,9 @@
       var li = el('li', 'ev ev-' + kind);
       li.appendChild(el('time', 'ev-at', ev && ev.at ? new Date(ev.at).toLocaleTimeString() : '—'));
       li.appendChild(el('span', 'ev-kind', kind === 'prompt' ? 'prompt' : kind === 'tool' ? 'herramienta' : 'texto'));
-      li.appendChild(el('div', 'ev-text', ev && ev.text != null ? String(ev.text) : ''));
+      var evText = el('div', 'ev-text', ev && ev.text != null ? String(ev.text) : '');
+      evText.title = evText.textContent; // los comandos se recortan a 2 líneas; el completo en el tooltip
+      li.appendChild(evText);
       ol.appendChild(li);
     });
     return ol;
@@ -1141,7 +1145,7 @@
 
     if (s.lastAction && s.lastAction.text) {
       var prefix = s.lastAction.kind === 'tool' ? '▸ ' : '“ ';
-      var ac = el('div', 'action', prefix + oneLine(s.lastAction.text));
+      var ac = el('div', 'action', prefix + (s.lastAction.kind === 'text' ? plainText(s.lastAction.text) : oneLine(s.lastAction.text)));
       ac.title = String(s.lastAction.text);
       nodes.push(ac);
     }

@@ -440,3 +440,8 @@ test('franja y fixture: las dos abandonadas del fixture no cuentan ni entran a l
   assert.ok(inbox.every((x) => !bandeja.isAbandoned(x, now)));
   assert.ok(fx.sessions.length - ab.length >= 15, 'el fixture tiene al menos 15 filas vivas');
 });
+
+test('plainText: encabezados que quedan en medio al juntar líneas', () => {
+  assert.strictEqual(bandeja.plainText('Keycloak cerrado.\n## Lo de Keycloak: listo'), 'Keycloak cerrado. Lo de Keycloak: listo');
+  assert.strictEqual(bandeja.plainText('PR #87 y C# quedan'), 'PR #87 y C# quedan');
+});
