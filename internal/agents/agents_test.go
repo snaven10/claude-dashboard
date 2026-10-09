@@ -134,3 +134,47 @@ func TestProjectName(t *testing.T) {
 		}
 	}
 }
+
+func TestRemoteURL(t *testing.T) {
+	valid := "session_01PheFY7bAAutvpmHjzYFAFy"
+	got := remoteURL(valid)
+	if got == nil || *got != "https://claude.ai/code/"+valid {
+		t.Fatalf("id válido: %v", got)
+	}
+	invalid := map[string]string{
+		"vacío":         "",
+		"formato viejo": "bridge-x",
+		"con /":         "session_01PheFY7/../x",
+		"con ?":         "session_01PheFY7bAAutv?x=1",
+		"con espacios":  "session_01PheFY7 bAAutv",
+		"con salto":     "session_01PheFY7bAAutv\n",
+		"muy corto":     "session_abc",
+		"muy largo":     "session_" + strings.Repeat("a", 65),
+		"sin prefijo":   "01PheFY7bAAutvpmHjzYFAFy",
+		"con guion":     "session_01PheFY7-bAAutv",
+	}
+	for name, id := range invalid {
+		if got := remoteURL(id); got != nil {
+			t.Errorf("%s (%q): esperaba nil, got %q", name, id, *got)
+		}
+	}
+	if long := remoteURL("session_" + strings.Repeat("a", 64)); long == nil {
+		t.Error("64 caracteres es el máximo válido")
+	}
+}
+
+func TestRemoteURLEnNormalize(t *testing.T) {
+	id := "session_01PheFY7bAAutvpmHjzYFAFy"
+	s := normalize(rawAgent{ID: "x", Kind: "interactive"}, rawSession{BridgeSessionID: id})
+	if !s.Remote || s.RemoteURL == nil || *s.RemoteURL != "https://claude.ai/code/"+id {
+		t.Errorf("válido: %+v", s)
+	}
+	// id raro: sigue "remote" como hoy, pero sin URL.
+	s = normalize(rawAgent{ID: "x"}, rawSession{BridgeSessionID: "bridge-x"})
+	if !s.Remote || s.RemoteURL != nil {
+		t.Errorf("inválido: %+v", s)
+	}
+	if s = normalize(rawAgent{ID: "x"}, rawSession{}); s.Remote || s.RemoteURL != nil {
+		t.Errorf("sin bridge: %+v", s)
+	}
+}

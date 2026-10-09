@@ -139,6 +139,48 @@
     return fields.some(function (f) { return normalizeText(f).indexOf(n) !== -1; });
   }
 
+  // ---- PLAN-004 ----
+
+  // DD-18 en el cliente también: el link va a un href y a un QR, no se confía en el server.
+  var REMOTE_URL_RE = /^https:\/\/claude\.ai\/code\/session_[A-Za-z0-9]{10,64}$/;
+
+  function validRemoteUrl(u) { return typeof u === 'string' && REMOTE_URL_RE.test(u); }
+
+  // DD-20: 'qr' (botón con QR), 'enable' (interactiva sin link: indicar /remote-control)
+  // o 'none' (background sin link: no se promete nada).
+  function phoneMode(s) {
+    if (!s) return 'none';
+    if (validRemoteUrl(s.remoteUrl)) return 'qr';
+    if (s.kind === 'interactive') return 'enable';
+    return 'none';
+  }
+
+  // DD-20: --resume sobre una interactiva abierta crea una segunda copia de la conversación.
+  function resumeWarning(s) {
+    if (!s || s.kind !== 'interactive' || s.status === 'done') return '';
+    var t = 'Ojo: si esta sesión sigue abierta, --resume abre una segunda copia de la conversación.';
+    if (validRemoteUrl(s.remoteUrl)) t += ' Usá el QR (📱) para continuarla en el teléfono.';
+    return t;
+  }
+
+  // Matriz de módulos oscuros (n x n) a partir de qrcode-generator. Solo usa
+  // addData/make/getModuleCount/isDark: nunca los generadores de HTML de la librería (DD-19).
+  function qrMatrix(url, factory) {
+    var f = factory || (typeof qrcode !== 'undefined' ? qrcode : null);
+    if (!f) return [];
+    var qr = f(0, 'M');
+    qr.addData(url);
+    qr.make();
+    var n = qr.getModuleCount();
+    var rows = [];
+    for (var r = 0; r < n; r++) {
+      var row = [];
+      for (var c = 0; c < n; c++) row.push(!!qr.isDark(r, c));
+      rows.push(row);
+    }
+    return rows;
+  }
+
   if (typeof document === 'undefined') {
     if (typeof module !== 'undefined' && module.exports) {
       module.exports = {
@@ -146,7 +188,8 @@
         groupByPlan: groupByPlan, orqLabel: orqLabel,
         formatContext: formatContext, contextTitle: contextTitle, rateTitle: rateTitle,
         planTotals: planTotals, isOldDone: isOldDone, splitOldDone: splitOldDone,
-        normalizeText: normalizeText, matchesQuery: matchesQuery
+        normalizeText: normalizeText, matchesQuery: matchesQuery,
+        validRemoteUrl: validRemoteUrl, phoneMode: phoneMode, resumeWarning: resumeWarning, qrMatrix: qrMatrix
       };
     }
     return;
@@ -360,7 +403,18 @@
       c.appendChild(rb);
     }
 
+    var mode = phoneMode(s);
+    if (mode === 'enable') {
+      c.appendChild(el('div', 'remote-hint', '📱 Para abrirla en el teléfono, activalo escribiendo /remote-control (o /rc) en esa sesión; el QR aparece solo en ~3 s.'));
+    }
+
     var foot = el('div', 'card-foot');
+    if (mode === 'qr') {
+      var ph = el('button', null, '📱 abrir en el teléfono');
+      ph.type = 'button';
+      ph.addEventListener('click', function (ev) { ev.stopPropagation(); openPhone(s, ph); });
+      foot.appendChild(ph);
+    }
     var tl = el('button', null, 'línea de tiempo');
     tl.type = 'button';
     tl.addEventListener('click', function (ev) { ev.stopPropagation(); openTimeline(s, tl); });
@@ -370,8 +424,10 @@
     btn.addEventListener('click', function () { copyText(copyCommand(s), btn); });
     foot.appendChild(btn);
     c.appendChild(foot);
+    var warn = resumeWarning(s);
+    if (warn) c.appendChild(el('div', 'resume-warn', warn));
     c.addEventListener('click', function (ev) {
-      if (ev.target.closest('button, .prompt')) return;
+      if (ev.target.closest('button, .prompt, a')) return;
       openTimeline(s, null);
     });
     return c;
@@ -494,6 +550,69 @@
     });
   }
 
+  // ---- Abrir en el teléfono (DD-19/DD-20) ----
+
+  var phoneFocus = null;
+
+  function closePhone() {
+    var p = $('phone');
+    if (p.hidden) return;
+    p.hidden = true;
+    if (phoneFocus && phoneFocus.isConnected) phoneFocus.focus();
+    phoneFocus = null;
+  }
+
+  // Pinta la matriz en un canvas: fondo blanco SIEMPRE y margen de 4 módulos (quiet zone).
+  function drawQr(canvas, rows) {
+    var quiet = 4;
+    var cell = 6;
+    var n = rows.length;
+    var size = (n + quiet * 2) * cell;
+    canvas.width = size;
+    canvas.height = size;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#000000';
+    for (var r = 0; r < n; r++) {
+      for (var c = 0; c < n; c++) {
+        if (rows[r][c]) ctx.fillRect((c + quiet) * cell, (r + quiet) * cell, cell, cell);
+      }
+    }
+  }
+
+  function openPhone(s, opener) {
+    if (!validRemoteUrl(s.remoteUrl)) return;
+    var rows;
+    try { rows = qrMatrix(s.remoteUrl); } catch (e) { rows = []; }
+    var body = $('phone-body');
+    body.replaceChildren();
+    $('phone-title').textContent = 'Abrir en el teléfono — ' + (s.title || s.name || s.id);
+    if (rows.length) {
+      var canvas = el('canvas', 'qr');
+      canvas.setAttribute('role', 'img');
+      canvas.setAttribute('aria-label', 'Código QR con el link de la sesión');
+      drawQr(canvas, rows);
+      body.appendChild(canvas);
+    } else {
+      body.appendChild(el('p', 'empty', 'No se pudo generar el QR; usá el link.'));
+    }
+    body.appendChild(el('p', 'phone-help', 'Escaneá el QR con la cámara del teléfono, o abrí el link.'));
+    var a = el('a', 'phone-link', s.remoteUrl);
+    a.href = s.remoteUrl;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    body.appendChild(a);
+    var cp = el('button', null, 'copiar link');
+    cp.type = 'button';
+    cp.addEventListener('click', function () { copyText(s.remoteUrl, cp); });
+    body.appendChild(cp);
+
+    phoneFocus = opener || document.activeElement;
+    $('phone').hidden = false;
+    $('phone-close').focus();
+  }
+
   // ---- Línea de tiempo ----
 
   function closeTimeline() {
@@ -583,12 +702,15 @@
     chkGroup.addEventListener('change', function () { groupByPlanOn = chkGroup.checked; writeFlag(GROUP_KEY, groupByPlanOn); render(); });
     $('btn-notify').addEventListener('click', toggleNotify);
     updateNotifyBtn();
+    $('phone-close').addEventListener('click', closePhone);
+    $('phone').addEventListener('click', function (ev) { if (ev.target === $('phone')) closePhone(); });
     $('timeline-close').addEventListener('click', closeTimeline);
     $('timeline').addEventListener('click', function (ev) { if (ev.target === $('timeline')) closeTimeline(); });
     var search = $('f-search');
     search.addEventListener('input', function () { query = search.value; render(); });
     document.addEventListener('keydown', function (ev) {
       if (ev.key === 'Escape') {
+        if (!$('phone').hidden) { closePhone(); return; }
         if (!$('timeline').hidden) { closeTimeline(); return; }
         if (search.value) { search.value = ''; query = ''; render(); }
         if (document.activeElement === search) search.blur();

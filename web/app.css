@@ -316,3 +316,12 @@ button:focus-visible, select:focus-visible, input:focus-visible {
   width: 14rem;
   max-width: 55vw;
 }
+
+/* ---- PLAN-004 ---- */
+.remote-hint, .resume-warn { font-size: 0.8rem; color: var(--muted); overflow-wrap: anywhere; }
+.card-foot { flex-wrap: wrap; }
+.phone-body { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
+/* el QR necesita fondo claro siempre (también en modo oscuro) para que lo lea la cámara */
+.qr { background: #ffffff; width: min(100%, 320px); height: auto; aspect-ratio: 1; image-rendering: pixelated; border-radius: 4px; }
+.phone-help { margin: 0; font-size: 0.85rem; color: var(--muted); text-align: center; }
+.phone-link { max-width: 100%; overflow-wrap: anywhere; text-align: center; color: var(--busy); font-size: 0.85rem; }
