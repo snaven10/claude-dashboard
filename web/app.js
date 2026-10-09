@@ -407,7 +407,7 @@
       if (filters.project && s.project !== filters.project) return false;
       if (filters.hideDone && st === 'done') return false;
       if (filters.hideIdle && st === 'idle') return false;
-      if (!matchesStatus(s, filters.status)) return false;
+      if (!matchesStatus({ status: st }, filters.status)) return false;
       return true;
     });
   }

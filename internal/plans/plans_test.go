@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -158,6 +159,33 @@ func TestEstadoChangeIsReflected(t *testing.T) {
 		t.Fatal(err)
 	}
 	if p := Find(1, repo, home); p == nil || p.Done != 1 || p.Pending != 0 {
+		t.Fatalf("después: %+v", p)
+	}
+}
+
+// `pending` → `blocked` no cambia el tamaño: el cache tiene que mirar el mtime.
+func TestEstadoSameSizeChangeIsReflected(t *testing.T) {
+	home := t.TempDir()
+	repo := filepath.Join(home, "r")
+	mkPlan(t, repo, "PLAN-001-x", "`pending`")
+	if p := Find(1, repo, home); p == nil || p.Pending != 1 {
+		t.Fatalf("antes: %+v", p)
+	}
+	f := filepath.Join(repo, "plans", "PLAN-001-x", "tasks", "TASK-001-x.md")
+	before, err := os.ReadFile(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after := strings.Replace(string(before), "`pending`", "`blocked`", 1)
+	if len(after) != len(before) {
+		t.Fatal("el fixture tiene que mantener el tamaño")
+	}
+	write(t, f, after)
+	future := time.Now().Add(2 * time.Second)
+	if err := os.Chtimes(f, future, future); err != nil {
+		t.Fatal(err)
+	}
+	if p := Find(1, repo, home); p == nil || p.Blocked != 1 || p.Pending != 0 {
 		t.Fatalf("después: %+v", p)
 	}
 }

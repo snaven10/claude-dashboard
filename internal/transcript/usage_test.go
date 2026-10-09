@@ -378,3 +378,40 @@ func TestErrorsIncremental(t *testing.T) {
 		t.Errorf("leyó %d bytes, quiero %d", got, len(first)+len(more))
 	}
 }
+
+// La poda acota la memoria: errores más de 10 min detrás del más nuevo no se guardan.
+func TestErrorsPruneBoundsMemory(t *testing.T) {
+	_, path := usageSetup(t)
+	base := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	var b strings.Builder
+	for i := 0; i < 60; i++ {
+		b.WriteString(errLine(base.Add(time.Duration(i)*time.Minute).Format("2006-01-02T15:04:05.000Z"), "e", `"x"`))
+	}
+	appendFile(t, path, b.String())
+	if _, err := Errors("/work/usage", "sess-u", base.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	st := stateFor(path)
+	st.mu.Lock()
+	n := len(st.errTimes)
+	st.mu.Unlock()
+	if n > 11 {
+		t.Errorf("guardó %d timestamps, quiero como mucho 11 (ventana de 10 min)", n)
+	}
+}
+
+// Un transcript truncado o rotado empieza de cero también para los errores.
+func TestErrorsResetOnTruncate(t *testing.T) {
+	_, path := usageSetup(t)
+	now := time.Date(2026, 1, 1, 10, 5, 0, 0, time.UTC)
+	appendFile(t, path, errLine("2026-01-01T10:01:00.000Z", "e1", `"x"`)+errLine("2026-01-01T10:02:00.000Z", "e2", `"y"`))
+	if e, _ := Errors("/work/usage", "sess-u", now); e == nil || e.Count != 2 {
+		t.Fatalf("antes: %+v", e)
+	}
+	if err := os.WriteFile(path, []byte(errLine("2026-01-01T10:03:00.000Z", "e3", `"z"`)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if e, _ := Errors("/work/usage", "sess-u", now); e == nil || e.Count != 1 {
+		t.Fatalf("después de truncar: %+v, quiero 1", e)
+	}
+}

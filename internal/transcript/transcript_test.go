@@ -253,3 +253,11 @@ func TestAskTruncatesTo300Runes(t *testing.T) {
 		t.Fatalf("ask = %+v, quiero 300 runas", d.Ask)
 	}
 }
+
+func TestAskQuestionTruncatesTo300Runes(t *testing.T) {
+	long := strings.Repeat("é", 400)
+	d, _ := parse([]byte(uPrompt("x") + aTool("q1", "AskUserQuestion", `{"questions":[{"question":"`+long+`"}]}`)))
+	if d.Ask == nil || d.Ask.Kind != "question" || len([]rune(d.Ask.Text)) != 300 {
+		t.Fatalf("ask = %+v, quiero la pregunta truncada a 300 runas", d.Ask)
+	}
+}
