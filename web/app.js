@@ -84,7 +84,9 @@
     var info = g && g.info;
     var head = g && g.plan !== null && g.plan !== undefined ? 'PLAN-' + g.plan : 'Sin plan';
     if (!info || typeof info.total !== 'number') return head;
-    var parts = [head, (info.done || 0) + '/' + info.total + ' done'];
+    var doneTxt = (info.done || 0) + '/' + info.total + ' done';
+    if (info.unmerged > 0) doneTxt += ' (' + info.unmerged + ' sin mergear)';
+    var parts = [head, doneTxt];
     if (info.blocked > 0) parts.push(info.blocked + ' blocked');
     if (info.inProgress > 0) parts.push(info.inProgress + ' in_progress');
     return parts.join(' · ');
@@ -257,6 +259,39 @@
     return rows;
   }
 
+  // ---- Historial (DD-29) ----
+
+  // Escala de barras: el máximo de `output` del período = 100 %. Los días en 0 no tienen
+  // barra (pct 0) pero conservan su lugar. Todo en 0 → todo pct 0 (sin dividir por cero).
+  function historyScale(days) {
+    var list = Array.isArray(days) ? days : [];
+    var max = 0;
+    list.forEach(function (d) { if (d && typeof d.output === 'number' && d.output > max) max = d.output; });
+    return list.map(function (d) {
+      var out = d && typeof d.output === 'number' && d.output > 0 ? d.output : 0;
+      return { date: d && d.date ? String(d.date) : '', output: out, pct: max > 0 ? out / max * 100 : 0 };
+    });
+  }
+
+  // Día elegido: el de `date` si existe; si no, el último (hoy). null si no hay días.
+  function selectDay(days, date) {
+    if (!Array.isArray(days) || !days.length) return null;
+    for (var i = 0; i < days.length; i++) if (days[i] && days[i].date === date) return days[i];
+    return days[days.length - 1];
+  }
+
+  // Filas de una tabla por modelo/proyecto; `share` = fracción del total del día (0 si total 0).
+  function historyRows(list) {
+    if (!Array.isArray(list)) return [];
+    var sum = 0;
+    list.forEach(function (r) { if (r && typeof r.total === 'number') sum += r.total; });
+    return list.filter(Boolean).map(function (r) {
+      var total = typeof r.total === 'number' ? r.total : 0;
+      return { name: r.name != null ? String(r.name) : '', output: typeof r.output === 'number' ? r.output : 0,
+        total: total, share: sum > 0 ? total / sum : 0 };
+    });
+  }
+
   if (typeof document === 'undefined') {
     if (typeof module !== 'undefined' && module.exports) {
       module.exports = {
@@ -267,6 +302,7 @@
         formatContext: formatContext, contextTitle: contextTitle, rateTitle: rateTitle,
         planTotals: planTotals, isOldDone: isOldDone, splitOldDone: splitOldDone,
         normalizeText: normalizeText, matchesQuery: matchesQuery,
+        historyScale: historyScale, selectDay: selectDay, historyRows: historyRows,
         validRemoteUrl: validRemoteUrl, phoneMode: phoneMode, resumeWarning: resumeWarning, qrMatrix: qrMatrix
       };
     }
@@ -822,6 +858,103 @@
       });
   }
 
+  // ---- Historial ----
+
+  var historyTimer = null;
+  var historyDate = null;
+  var historyData = null;
+
+  function closeHistory() {
+    var p = $('history');
+    if (p.hidden) return;
+    p.hidden = true;
+    if (historyTimer) { clearTimeout(historyTimer); historyTimer = null; }
+    if (lastFocus && lastFocus.isConnected) lastFocus.focus();
+    lastFocus = null;
+  }
+
+  function historyTable(title, rows) {
+    var wrap = el('div', 'hist-table');
+    wrap.appendChild(el('h3', null, title));
+    if (!rows.length) { wrap.appendChild(el('p', 'empty', 'Sin datos.')); return wrap; }
+    var t = el('table');
+    var hr = el('tr');
+    ['Nombre', 'Output', 'Total'].forEach(function (h) { hr.appendChild(el('th', null, h)); });
+    t.appendChild(hr);
+    rows.forEach(function (r) {
+      var tr = el('tr');
+      tr.appendChild(el('td', 'hist-name', r.name));
+      tr.appendChild(el('td', 'num', formatTokens(r.output)));
+      tr.appendChild(el('td', 'num', formatTokens(r.total) + ' (' + Math.round(r.share * 100) + '%)'));
+      t.appendChild(tr);
+    });
+    wrap.appendChild(t);
+    return wrap;
+  }
+
+  function renderHistory(d) {
+    var body = $('history-body');
+    var days = d && Array.isArray(d.days) ? d.days : [];
+    if (!d || d.ready === false || !days.length) {
+      body.replaceChildren(el('p', 'empty', 'calculando historial…'));
+      if (!FIXTURE || (d && d.ready === false)) {
+        historyTimer = setTimeout(function () { historyTimer = null; if (!$('history').hidden) loadHistory(); }, 3000);
+      }
+      return;
+    }
+    var sel = selectDay(days, historyDate);
+    historyDate = sel.date;
+    var today = days[days.length - 1].date;
+    var scale = historyScale(days);
+
+    var chart = el('div', 'hist-chart');
+    chart.setAttribute('role', 'group');
+    chart.setAttribute('aria-label', 'Output por día, últimos ' + days.length + ' días');
+    scale.forEach(function (b) {
+      var btn = el('button', 'hist-bar' + (b.date === sel.date ? ' selected' : '') + (b.date === today ? ' today' : ''));
+      btn.type = 'button';
+      btn.title = b.date + ': ' + formatTokens(b.output) + ' output' + (b.date === today ? ' (hoy)' : '');
+      btn.setAttribute('aria-label', btn.title);
+      btn.setAttribute('aria-pressed', b.date === sel.date ? 'true' : 'false');
+      var fill = el('span', 'hist-fill');
+      fill.style.height = b.pct + '%';
+      btn.appendChild(fill);
+      btn.addEventListener('click', function () { historyDate = b.date; renderHistory(historyData); });
+      chart.appendChild(btn);
+    });
+
+    var tot = el('p', 'hist-totals');
+    tot.textContent = sel.date + (sel.date === today ? ' (hoy)' : '') + ' · output ' + formatTokens(sel.output) +
+      ' · input ' + formatTokens(sel.input) + ' · cache lectura ' + formatTokens(sel.cacheRead) +
+      ' · cache creación ' + formatTokens(sel.cacheCreation) + ' · ' + (sel.messages || 0) + ' mensajes · ' +
+      (sel.sessions || 0) + ' sesiones';
+    var tables = el('div', 'hist-tables');
+    tables.appendChild(historyTable('Por modelo', historyRows(sel.byModel)));
+    tables.appendChild(historyTable('Por proyecto', historyRows(sel.byProject)));
+    body.replaceChildren(chart, tot, tables);
+  }
+
+  function loadHistory() {
+    var url = FIXTURE ? 'fixture-history.json' : '/api/history';
+    fetch(url)
+      .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+      .then(function (d) { if ($('history').hidden) return; historyData = d; renderHistory(d); })
+      .catch(function () {
+        if ($('history').hidden) return;
+        $('history-body').replaceChildren(el('p', 'empty', 'No se pudo cargar el historial.'));
+      });
+  }
+
+  function openHistory(opener) {
+    lastFocus = opener || document.activeElement;
+    historyDate = null;
+    historyData = null;
+    $('history-body').replaceChildren(el('p', 'empty', 'Cargando…'));
+    $('history').hidden = false;
+    $('history-close').focus();
+    loadHistory();
+  }
+
   function setSnapshot(data) {
     var next = data && Array.isArray(data.sessions) ? data.sessions : [];
     fireNotifications(notifyTargets(prevSessions, next));
@@ -876,6 +1009,9 @@
     updateNotifyBtn();
     $('phone-close').addEventListener('click', closePhone);
     $('phone').addEventListener('click', function (ev) { if (ev.target === $('phone')) closePhone(); });
+    $('history-close').addEventListener('click', closeHistory);
+    $('history').addEventListener('click', function (ev) { if (ev.target === $('history')) closeHistory(); });
+    $('btn-history').addEventListener('click', function (ev) { openHistory(ev.currentTarget); });
     $('timeline-close').addEventListener('click', closeTimeline);
     $('timeline').addEventListener('click', function (ev) { if (ev.target === $('timeline')) closeTimeline(); });
     var search = $('f-search');
@@ -883,6 +1019,7 @@
     document.addEventListener('keydown', function (ev) {
       if (ev.key === 'Escape') {
         if (!$('phone').hidden) { closePhone(); return; }
+        if (!$('history').hidden) { closeHistory(); return; }
         if (!$('timeline').hidden) { closeTimeline(); return; }
         if (search.value) { search.value = ''; query = ''; render(); }
         if (document.activeElement === search) search.blur();

@@ -1,0 +1,1762 @@
+{
+  "generatedAt": 1791476712278,
+  "ready": true,
+  "days": [
+    {
+      "date": "2026-09-09",
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheCreation": 0,
+      "messages": 0,
+      "sessions": 0,
+      "byModel": [],
+      "byProject": []
+    },
+    {
+      "date": "2026-09-10",
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheCreation": 0,
+      "messages": 0,
+      "sessions": 0,
+      "byModel": [],
+      "byProject": []
+    },
+    {
+      "date": "2026-09-11",
+      "input": 80,
+      "output": 120000,
+      "cacheRead": 57600000,
+      "cacheCreation": 2040000,
+      "messages": 266,
+      "sessions": 2,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 48000,
+          "total": 48000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 30000,
+          "total": 30000000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 18000,
+          "total": 18000000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 12000,
+          "total": 12000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 6000,
+          "total": 6000000
+        },
+        {
+          "name": "otros",
+          "output": 6000,
+          "total": 6000000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 48000,
+          "total": 48000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 30000,
+          "total": 30000000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 18000,
+          "total": 18000000
+        },
+        {
+          "name": "demo-api",
+          "output": 12000,
+          "total": 12000000
+        },
+        {
+          "name": "demo-web",
+          "output": 6000,
+          "total": 6000000
+        },
+        {
+          "name": "otros",
+          "output": 6000,
+          "total": 6000000
+        }
+      ]
+    },
+    {
+      "date": "2026-09-12",
+      "input": 226,
+      "output": 340000,
+      "cacheRead": 163200000,
+      "cacheCreation": 5780000,
+      "messages": 755,
+      "sessions": 5,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 136000,
+          "total": 136000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 85000,
+          "total": 85000000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 51000,
+          "total": 51000000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 34000,
+          "total": 34000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 17000,
+          "total": 17000000
+        },
+        {
+          "name": "otros",
+          "output": 17000,
+          "total": 17000000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 136000,
+          "total": 136000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 85000,
+          "total": 85000000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 51000,
+          "total": 51000000
+        },
+        {
+          "name": "demo-api",
+          "output": 34000,
+          "total": 34000000
+        },
+        {
+          "name": "demo-web",
+          "output": 17000,
+          "total": 17000000
+        },
+        {
+          "name": "otros",
+          "output": 17000,
+          "total": 17000000
+        }
+      ]
+    },
+    {
+      "date": "2026-09-13",
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheCreation": 0,
+      "messages": 0,
+      "sessions": 0,
+      "byModel": [],
+      "byProject": []
+    },
+    {
+      "date": "2026-09-14",
+      "input": 373,
+      "output": 560000,
+      "cacheRead": 268800000,
+      "cacheCreation": 9520000,
+      "messages": 1244,
+      "sessions": 8,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 224000,
+          "total": 224000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 140000,
+          "total": 140000000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 84000,
+          "total": 84000000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 56000,
+          "total": 56000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 28000,
+          "total": 28000000
+        },
+        {
+          "name": "otros",
+          "output": 28000,
+          "total": 28000000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 224000,
+          "total": 224000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 140000,
+          "total": 140000000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 84000,
+          "total": 84000000
+        },
+        {
+          "name": "demo-api",
+          "output": 56000,
+          "total": 56000000
+        },
+        {
+          "name": "demo-web",
+          "output": 28000,
+          "total": 28000000
+        },
+        {
+          "name": "otros",
+          "output": 28000,
+          "total": 28000000
+        }
+      ]
+    },
+    {
+      "date": "2026-09-15",
+      "input": 606,
+      "output": 910000,
+      "cacheRead": 436800000,
+      "cacheCreation": 15470000,
+      "messages": 2022,
+      "sessions": 12,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 364000,
+          "total": 364000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 227500,
+          "total": 227500000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 136500,
+          "total": 136500000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 91000,
+          "total": 91000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 45500,
+          "total": 45500000
+        },
+        {
+          "name": "otros",
+          "output": 45500,
+          "total": 45500000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 364000,
+          "total": 364000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 227500,
+          "total": 227500000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 136500,
+          "total": 136500000
+        },
+        {
+          "name": "demo-api",
+          "output": 91000,
+          "total": 91000000
+        },
+        {
+          "name": "demo-web",
+          "output": 45500,
+          "total": 45500000
+        },
+        {
+          "name": "otros",
+          "output": 45500,
+          "total": 45500000
+        }
+      ]
+    },
+    {
+      "date": "2026-09-16",
+      "input": 280,
+      "output": 420000,
+      "cacheRead": 201600000,
+      "cacheCreation": 7140000,
+      "messages": 933,
+      "sessions": 6,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 168000,
+          "total": 168000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 105000,
+          "total": 105000000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 63000,
+          "total": 63000000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 42000,
+          "total": 42000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 21000,
+          "total": 21000000
+        },
+        {
+          "name": "otros",
+          "output": 21000,
+          "total": 21000000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 168000,
+          "total": 168000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 105000,
+          "total": 105000000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 63000,
+          "total": 63000000
+        },
+        {
+          "name": "demo-api",
+          "output": 42000,
+          "total": 42000000
+        },
+        {
+          "name": "demo-web",
+          "output": 21000,
+          "total": 21000000
+        },
+        {
+          "name": "otros",
+          "output": 21000,
+          "total": 21000000
+        }
+      ]
+    },
+    {
+      "date": "2026-09-17",
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheCreation": 0,
+      "messages": 0,
+      "sessions": 0,
+      "byModel": [],
+      "byProject": []
+    },
+    {
+      "date": "2026-09-18",
+      "input": 53,
+      "output": 80000,
+      "cacheRead": 38400000,
+      "cacheCreation": 1360000,
+      "messages": 177,
+      "sessions": 2,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 32000,
+          "total": 32000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 20000,
+          "total": 20000000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 12000,
+          "total": 12000000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 8000,
+          "total": 8000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 4000,
+          "total": 4000000
+        },
+        {
+          "name": "otros",
+          "output": 4000,
+          "total": 4000000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 32000,
+          "total": 32000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 20000,
+          "total": 20000000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 12000,
+          "total": 12000000
+        },
+        {
+          "name": "demo-api",
+          "output": 8000,
+          "total": 8000000
+        },
+        {
+          "name": "demo-web",
+          "output": 4000,
+          "total": 4000000
+        },
+        {
+          "name": "otros",
+          "output": 4000,
+          "total": 4000000
+        }
+      ]
+    },
+    {
+      "date": "2026-09-19",
+      "input": 100,
+      "output": 150000,
+      "cacheRead": 72000000,
+      "cacheCreation": 2550000,
+      "messages": 333,
+      "sessions": 2,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 60000,
+          "total": 60000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 37500,
+          "total": 37500000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 22500,
+          "total": 22500000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 15000,
+          "total": 15000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 7500,
+          "total": 7500000
+        },
+        {
+          "name": "otros",
+          "output": 7500,
+          "total": 7500000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 60000,
+          "total": 60000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 37500,
+          "total": 37500000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 22500,
+          "total": 22500000
+        },
+        {
+          "name": "demo-api",
+          "output": 15000,
+          "total": 15000000
+        },
+        {
+          "name": "demo-web",
+          "output": 7500,
+          "total": 7500000
+        },
+        {
+          "name": "otros",
+          "output": 7500,
+          "total": 7500000
+        }
+      ]
+    },
+    {
+      "date": "2026-09-20",
+      "input": 466,
+      "output": 700000,
+      "cacheRead": 336000000,
+      "cacheCreation": 11900000,
+      "messages": 1555,
+      "sessions": 9,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 280000,
+          "total": 280000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 175000,
+          "total": 175000000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 105000,
+          "total": 105000000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 70000,
+          "total": 70000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 35000,
+          "total": 35000000
+        },
+        {
+          "name": "otros",
+          "output": 35000,
+          "total": 35000000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 280000,
+          "total": 280000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 175000,
+          "total": 175000000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 105000,
+          "total": 105000000
+        },
+        {
+          "name": "demo-api",
+          "output": 70000,
+          "total": 70000000
+        },
+        {
+          "name": "demo-web",
+          "output": 35000,
+          "total": 35000000
+        },
+        {
+          "name": "otros",
+          "output": 35000,
+          "total": 35000000
+        }
+      ]
+    },
+    {
+      "date": "2026-09-21",
+      "input": 833,
+      "output": 1250000,
+      "cacheRead": 600000000,
+      "cacheCreation": 21250000,
+      "messages": 2777,
+      "sessions": 16,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 500000,
+          "total": 500000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 312500,
+          "total": 312500000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 187500,
+          "total": 187500000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 125000,
+          "total": 125000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 62500,
+          "total": 62500000
+        },
+        {
+          "name": "otros",
+          "output": 62500,
+          "total": 62500000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 500000,
+          "total": 500000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 312500,
+          "total": 312500000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 187500,
+          "total": 187500000
+        },
+        {
+          "name": "demo-api",
+          "output": 125000,
+          "total": 125000000
+        },
+        {
+          "name": "demo-web",
+          "output": 62500,
+          "total": 62500000
+        },
+        {
+          "name": "otros",
+          "output": 62500,
+          "total": 62500000
+        }
+      ]
+    },
+    {
+      "date": "2026-09-22",
+      "input": 586,
+      "output": 880000,
+      "cacheRead": 422400000,
+      "cacheCreation": 14960000,
+      "messages": 1955,
+      "sessions": 12,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 352000,
+          "total": 352000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 220000,
+          "total": 220000000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 132000,
+          "total": 132000000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 88000,
+          "total": 88000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 44000,
+          "total": 44000000
+        },
+        {
+          "name": "otros",
+          "output": 44000,
+          "total": 44000000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 352000,
+          "total": 352000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 220000,
+          "total": 220000000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 132000,
+          "total": 132000000
+        },
+        {
+          "name": "demo-api",
+          "output": 88000,
+          "total": 88000000
+        },
+        {
+          "name": "demo-web",
+          "output": 44000,
+          "total": 44000000
+        },
+        {
+          "name": "otros",
+          "output": 44000,
+          "total": 44000000
+        }
+      ]
+    },
+    {
+      "date": "2026-09-23",
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheCreation": 0,
+      "messages": 0,
+      "sessions": 0,
+      "byModel": [],
+      "byProject": []
+    },
+    {
+      "date": "2026-09-24",
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheCreation": 0,
+      "messages": 0,
+      "sessions": 0,
+      "byModel": [],
+      "byProject": []
+    },
+    {
+      "date": "2026-09-25",
+      "input": 206,
+      "output": 310000,
+      "cacheRead": 148800000,
+      "cacheCreation": 5270000,
+      "messages": 688,
+      "sessions": 4,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 124000,
+          "total": 124000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 77500,
+          "total": 77500000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 46500,
+          "total": 46500000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 31000,
+          "total": 31000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 15500,
+          "total": 15500000
+        },
+        {
+          "name": "otros",
+          "output": 15500,
+          "total": 15500000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 124000,
+          "total": 124000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 77500,
+          "total": 77500000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 46500,
+          "total": 46500000
+        },
+        {
+          "name": "demo-api",
+          "output": 31000,
+          "total": 31000000
+        },
+        {
+          "name": "demo-web",
+          "output": 15500,
+          "total": 15500000
+        },
+        {
+          "name": "otros",
+          "output": 15500,
+          "total": 15500000
+        }
+      ]
+    },
+    {
+      "date": "2026-09-26",
+      "input": 426,
+      "output": 640000,
+      "cacheRead": 307200000,
+      "cacheCreation": 10880000,
+      "messages": 1422,
+      "sessions": 9,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 256000,
+          "total": 256000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 160000,
+          "total": 160000000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 96000,
+          "total": 96000000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 64000,
+          "total": 64000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 32000,
+          "total": 32000000
+        },
+        {
+          "name": "otros",
+          "output": 32000,
+          "total": 32000000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 256000,
+          "total": 256000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 160000,
+          "total": 160000000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 96000,
+          "total": 96000000
+        },
+        {
+          "name": "demo-api",
+          "output": 64000,
+          "total": 64000000
+        },
+        {
+          "name": "demo-web",
+          "output": 32000,
+          "total": 32000000
+        },
+        {
+          "name": "otros",
+          "output": 32000,
+          "total": 32000000
+        }
+      ]
+    },
+    {
+      "date": "2026-09-27",
+      "input": 660,
+      "output": 990000,
+      "cacheRead": 475200000,
+      "cacheCreation": 16830000,
+      "messages": 2200,
+      "sessions": 13,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 396000,
+          "total": 396000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 247500,
+          "total": 247500000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 148500,
+          "total": 148500000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 99000,
+          "total": 99000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 49500,
+          "total": 49500000
+        },
+        {
+          "name": "otros",
+          "output": 49500,
+          "total": 49500000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 396000,
+          "total": 396000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 247500,
+          "total": 247500000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 148500,
+          "total": 148500000
+        },
+        {
+          "name": "demo-api",
+          "output": 99000,
+          "total": 99000000
+        },
+        {
+          "name": "demo-web",
+          "output": 49500,
+          "total": 49500000
+        },
+        {
+          "name": "otros",
+          "output": 49500,
+          "total": 49500000
+        }
+      ]
+    },
+    {
+      "date": "2026-09-28",
+      "input": 1000,
+      "output": 1500000,
+      "cacheRead": 720000000,
+      "cacheCreation": 25500000,
+      "messages": 3333,
+      "sessions": 19,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 600000,
+          "total": 600000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 375000,
+          "total": 375000000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 225000,
+          "total": 225000000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 150000,
+          "total": 150000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 75000,
+          "total": 75000000
+        },
+        {
+          "name": "otros",
+          "output": 75000,
+          "total": 75000000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 600000,
+          "total": 600000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 375000,
+          "total": 375000000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 225000,
+          "total": 225000000
+        },
+        {
+          "name": "demo-api",
+          "output": 150000,
+          "total": 150000000
+        },
+        {
+          "name": "demo-web",
+          "output": 75000,
+          "total": 75000000
+        },
+        {
+          "name": "otros",
+          "output": 75000,
+          "total": 75000000
+        }
+      ]
+    },
+    {
+      "date": "2026-09-29",
+      "input": 733,
+      "output": 1100000,
+      "cacheRead": 528000000,
+      "cacheCreation": 18700000,
+      "messages": 2444,
+      "sessions": 14,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 440000,
+          "total": 440000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 275000,
+          "total": 275000000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 165000,
+          "total": 165000000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 110000,
+          "total": 110000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 55000,
+          "total": 55000000
+        },
+        {
+          "name": "otros",
+          "output": 55000,
+          "total": 55000000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 440000,
+          "total": 440000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 275000,
+          "total": 275000000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 165000,
+          "total": 165000000
+        },
+        {
+          "name": "demo-api",
+          "output": 110000,
+          "total": 110000000
+        },
+        {
+          "name": "demo-web",
+          "output": 55000,
+          "total": 55000000
+        },
+        {
+          "name": "otros",
+          "output": 55000,
+          "total": 55000000
+        }
+      ]
+    },
+    {
+      "date": "2026-09-30",
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheCreation": 0,
+      "messages": 0,
+      "sessions": 0,
+      "byModel": [],
+      "byProject": []
+    },
+    {
+      "date": "2026-10-01",
+      "input": 153,
+      "output": 230000,
+      "cacheRead": 110400000,
+      "cacheCreation": 3910000,
+      "messages": 511,
+      "sessions": 3,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 92000,
+          "total": 92000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 57500,
+          "total": 57500000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 34500,
+          "total": 34500000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 23000,
+          "total": 23000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 11500,
+          "total": 11500000
+        },
+        {
+          "name": "otros",
+          "output": 11500,
+          "total": 11500000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 92000,
+          "total": 92000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 57500,
+          "total": 57500000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 34500,
+          "total": 34500000
+        },
+        {
+          "name": "demo-api",
+          "output": 23000,
+          "total": 23000000
+        },
+        {
+          "name": "demo-web",
+          "output": 11500,
+          "total": 11500000
+        },
+        {
+          "name": "otros",
+          "output": 11500,
+          "total": 11500000
+        }
+      ]
+    },
+    {
+      "date": "2026-10-02",
+      "input": 313,
+      "output": 470000,
+      "cacheRead": 225600000,
+      "cacheCreation": 7990000,
+      "messages": 1044,
+      "sessions": 6,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 188000,
+          "total": 188000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 117500,
+          "total": 117500000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 70500,
+          "total": 70500000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 47000,
+          "total": 47000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 23500,
+          "total": 23500000
+        },
+        {
+          "name": "otros",
+          "output": 23500,
+          "total": 23500000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 188000,
+          "total": 188000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 117500,
+          "total": 117500000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 70500,
+          "total": 70500000
+        },
+        {
+          "name": "demo-api",
+          "output": 47000,
+          "total": 47000000
+        },
+        {
+          "name": "demo-web",
+          "output": 23500,
+          "total": 23500000
+        },
+        {
+          "name": "otros",
+          "output": 23500,
+          "total": 23500000
+        }
+      ]
+    },
+    {
+      "date": "2026-10-03",
+      "input": 546,
+      "output": 820000,
+      "cacheRead": 393600000,
+      "cacheCreation": 13940000,
+      "messages": 1822,
+      "sessions": 11,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 328000,
+          "total": 328000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 205000,
+          "total": 205000000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 123000,
+          "total": 123000000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 82000,
+          "total": 82000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 41000,
+          "total": 41000000
+        },
+        {
+          "name": "otros",
+          "output": 41000,
+          "total": 41000000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 328000,
+          "total": 328000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 205000,
+          "total": 205000000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 123000,
+          "total": 123000000
+        },
+        {
+          "name": "demo-api",
+          "output": 82000,
+          "total": 82000000
+        },
+        {
+          "name": "demo-web",
+          "output": 41000,
+          "total": 41000000
+        },
+        {
+          "name": "otros",
+          "output": 41000,
+          "total": 41000000
+        }
+      ]
+    },
+    {
+      "date": "2026-10-04",
+      "input": 893,
+      "output": 1340000,
+      "cacheRead": 643200000,
+      "cacheCreation": 22780000,
+      "messages": 2977,
+      "sessions": 17,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 536000,
+          "total": 536000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 335000,
+          "total": 335000000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 201000,
+          "total": 201000000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 134000,
+          "total": 134000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 67000,
+          "total": 67000000
+        },
+        {
+          "name": "otros",
+          "output": 67000,
+          "total": 67000000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 536000,
+          "total": 536000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 335000,
+          "total": 335000000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 201000,
+          "total": 201000000
+        },
+        {
+          "name": "demo-api",
+          "output": 134000,
+          "total": 134000000
+        },
+        {
+          "name": "demo-web",
+          "output": 67000,
+          "total": 67000000
+        },
+        {
+          "name": "otros",
+          "output": 67000,
+          "total": 67000000
+        }
+      ]
+    },
+    {
+      "date": "2026-10-05",
+      "input": 1186,
+      "output": 1780000,
+      "cacheRead": 854400000,
+      "cacheCreation": 30260000,
+      "messages": 3955,
+      "sessions": 23,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 712000,
+          "total": 712000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 445000,
+          "total": 445000000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 267000,
+          "total": 267000000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 178000,
+          "total": 178000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 89000,
+          "total": 89000000
+        },
+        {
+          "name": "otros",
+          "output": 89000,
+          "total": 89000000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 712000,
+          "total": 712000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 445000,
+          "total": 445000000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 267000,
+          "total": 267000000
+        },
+        {
+          "name": "demo-api",
+          "output": 178000,
+          "total": 178000000
+        },
+        {
+          "name": "demo-web",
+          "output": 89000,
+          "total": 89000000
+        },
+        {
+          "name": "otros",
+          "output": 89000,
+          "total": 89000000
+        }
+      ]
+    },
+    {
+      "date": "2026-10-06",
+      "input": 633,
+      "output": 950000,
+      "cacheRead": 456000000,
+      "cacheCreation": 16150000,
+      "messages": 2111,
+      "sessions": 12,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 380000,
+          "total": 380000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 237500,
+          "total": 237500000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 142500,
+          "total": 142500000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 95000,
+          "total": 95000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 47500,
+          "total": 47500000
+        },
+        {
+          "name": "otros",
+          "output": 47500,
+          "total": 47500000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 380000,
+          "total": 380000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 237500,
+          "total": 237500000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 142500,
+          "total": 142500000
+        },
+        {
+          "name": "demo-api",
+          "output": 95000,
+          "total": 95000000
+        },
+        {
+          "name": "demo-web",
+          "output": 47500,
+          "total": 47500000
+        },
+        {
+          "name": "otros",
+          "output": 47500,
+          "total": 47500000
+        }
+      ]
+    },
+    {
+      "date": "2026-10-07",
+      "input": 406,
+      "output": 610000,
+      "cacheRead": 292800000,
+      "cacheCreation": 10370000,
+      "messages": 1355,
+      "sessions": 8,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 244000,
+          "total": 244000000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 152500,
+          "total": 152500000
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 91500,
+          "total": 91500000
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 61000,
+          "total": 61000000
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 30500,
+          "total": 30500000
+        },
+        {
+          "name": "otros",
+          "output": 30500,
+          "total": 30500000
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 244000,
+          "total": 244000000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 152500,
+          "total": 152500000
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 91500,
+          "total": 91500000
+        },
+        {
+          "name": "demo-api",
+          "output": 61000,
+          "total": 61000000
+        },
+        {
+          "name": "demo-web",
+          "output": 30500,
+          "total": 30500000
+        },
+        {
+          "name": "otros",
+          "output": 30500,
+          "total": 30500000
+        }
+      ]
+    },
+    {
+      "date": "2026-10-08",
+      "input": 1266,
+      "output": 1899605,
+      "cacheRead": 911810400,
+      "cacheCreation": 32293285,
+      "messages": 4221,
+      "sessions": 24,
+      "byModel": [
+        {
+          "name": "claude-opus-5-5",
+          "output": 759842,
+          "total": 759842000
+        },
+        {
+          "name": "claude-sonnet-5-5",
+          "output": 474901,
+          "total": 474901250
+        },
+        {
+          "name": "claude-haiku-5",
+          "output": 284940,
+          "total": 284940750
+        },
+        {
+          "name": "claude-opus-4-1",
+          "output": 189960,
+          "total": 189960500
+        },
+        {
+          "name": "claude-sonnet-4",
+          "output": 94980,
+          "total": 94980250
+        },
+        {
+          "name": "otros",
+          "output": 94980,
+          "total": 94980250
+        }
+      ],
+      "byProject": [
+        {
+          "name": "<img src=x onerror=alert(1)>",
+          "output": 759842,
+          "total": 759842000
+        },
+        {
+          "name": "mi-empresa",
+          "output": 474901,
+          "total": 474901250
+        },
+        {
+          "name": "claude-dashboard",
+          "output": 284940,
+          "total": 284940750
+        },
+        {
+          "name": "demo-api",
+          "output": 189960,
+          "total": 189960500
+        },
+        {
+          "name": "demo-web",
+          "output": 94980,
+          "total": 94980250
+        },
+        {
+          "name": "otros",
+          "output": 94980,
+          "total": 94980250
+        }
+      ]
+    }
+  ]
+}

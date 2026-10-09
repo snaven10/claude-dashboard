@@ -298,3 +298,33 @@ test('fixture PLAN-005: cubre cada caso del contrato', () => {
   assert.ok(l.some((x) => x.branch && x.branch.length > 80));
   assert.ok(l.some((x) => x.branch && x.branch.startsWith('<')));
 });
+
+test('planHeading con y sin unmerged', () => {
+  assert.strictEqual(A.planHeading({ plan: '5', info: { total: 3, done: 3, unmerged: 2 } }), 'PLAN-5 · 3/3 done (2 sin mergear)');
+  assert.strictEqual(A.planHeading({ plan: '5', info: { total: 3, done: 3, unmerged: 0 } }), 'PLAN-5 · 3/3 done');
+  assert.strictEqual(A.planHeading({ plan: '5', info: { total: 3, done: 1, blocked: 1, unmerged: 1 } }), 'PLAN-5 · 1/3 done (1 sin mergear) · 1 blocked');
+});
+
+test('historyScale: máximo = 100 %, ceros sin barra pero con lugar, todo en 0 sin NaN', () => {
+  const sc = A.historyScale([{ date: 'a', output: 50 }, { date: 'b', output: 0 }, { date: 'c', output: 200 }]);
+  assert.deepStrictEqual(sc.map((x) => x.pct), [25, 0, 100]);
+  assert.strictEqual(sc.length, 3);
+  const z = A.historyScale([{ date: 'a', output: 0 }, { date: 'b' }]);
+  assert.deepStrictEqual(z.map((x) => x.pct), [0, 0]);
+  assert.deepStrictEqual(A.historyScale(null), []);
+});
+
+test('selectDay: por fecha, por defecto el último, null sin días', () => {
+  const days = [{ date: '2026-10-06' }, { date: '2026-10-07' }, { date: '2026-10-08' }];
+  assert.strictEqual(A.selectDay(days, '2026-10-07'), days[1]);
+  assert.strictEqual(A.selectDay(days, null), days[2]);
+  assert.strictEqual(A.selectDay(days, 'nope'), days[2]);
+  assert.strictEqual(A.selectDay([], 'x'), null);
+});
+
+test('historyRows: share del total y total 0 sin dividir por cero', () => {
+  const r = A.historyRows([{ name: 'a', output: 1, total: 75 }, { name: 'b', output: 2, total: 25 }]);
+  assert.deepStrictEqual(r.map((x) => x.share), [0.75, 0.25]);
+  assert.deepStrictEqual(A.historyRows([{ name: 'z', total: 0 }])[0].share, 0);
+  assert.deepStrictEqual(A.historyRows(undefined), []);
+});
