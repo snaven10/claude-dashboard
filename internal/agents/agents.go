@@ -94,6 +94,7 @@ type Plan struct {
 	Pending    int    `json:"pending"`
 	Skipped    int    `json:"skipped"`
 	Unknown    int    `json:"unknown"`
+	Unmerged   int    `json:"unmerged"`
 }
 
 // Context es el contexto actual y las compactaciones (DD-13). Sin porcentaje: el
