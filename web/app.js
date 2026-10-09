@@ -39,27 +39,103 @@
     return (t.input || 0) + (t.output || 0) + (t.cacheRead || 0) + (t.cacheCreation || 0);
   }
 
-  // Agrupa por plan de orq. Las que no son de orq van al grupo final (plan = null).
+  // DD-25: la clave es plan.path si hay `plan`; si no, orq.plan como antes.
+  function planKey(s) {
+    if (s && s.plan && typeof s.plan.path === 'string' && s.plan.path) return 'path:' + s.plan.path;
+    if (s && s.orq && s.orq.plan) return 'orq:' + String(s.orq.plan);
+    return '';
+  }
+
+  function planNumberOf(s) {
+    if (s && s.plan && typeof s.plan.number === 'number') return String(s.plan.number);
+    if (s && s.orq && s.orq.plan) return String(s.orq.plan);
+    return null;
+  }
+
+  // Agrupa por plan. Las sesiones sin plan van al grupo final (plan = null).
+  // Cada grupo: { key, plan (número como texto), info (objeto `plan` del server o null), sessions, waiting }.
   function groupByPlan(list) {
     var map = {};
     var order = [];
     list.forEach(function (s) {
-      var plan = s.orq && s.orq.plan ? String(s.orq.plan) : null;
-      var k = plan === null ? '' : plan;
+      var k = planKey(s);
       if (!Object.prototype.hasOwnProperty.call(map, k)) {
-        map[k] = { plan: plan, sessions: [], waiting: 0 };
+        map[k] = { key: k, plan: k === '' ? null : planNumberOf(s), info: null, sessions: [], waiting: 0 };
         order.push(k);
       }
-      map[k].sessions.push(s);
-      if (isWaiting(s.status)) map[k].waiting++;
+      var g = map[k];
+      if (g.info === null && s.plan && typeof s.plan.path === 'string') g.info = s.plan;
+      g.sessions.push(s);
+      if (isWaiting(s.status)) g.waiting++;
     });
     var groups = order.map(function (k) { return map[k]; });
     groups.sort(function (a, b) {
-      if (a.plan === null) return 1;
-      if (b.plan === null) return -1;
-      return (parseInt(a.plan, 10) || 0) - (parseInt(b.plan, 10) || 0);
+      if (a.key === '') return 1;
+      if (b.key === '') return -1;
+      var d = (parseInt(a.plan, 10) || 0) - (parseInt(b.plan, 10) || 0);
+      if (d !== 0) return d;
+      return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
     });
     return groups;
+  }
+
+  // "PLAN-042 · 14/28 done · 4 blocked · 2 in_progress"; sin avance, solo "PLAN-N".
+  function planHeading(g) {
+    var info = g && g.info;
+    var head = g && g.plan !== null && g.plan !== undefined ? 'PLAN-' + g.plan : 'Sin plan';
+    if (!info || typeof info.total !== 'number') return head;
+    var parts = [head, (info.done || 0) + '/' + info.total + ' done'];
+    if (info.blocked > 0) parts.push(info.blocked + ' blocked');
+    if (info.inProgress > 0) parts.push(info.inProgress + ' in_progress');
+    return parts.join(' · ');
+  }
+
+  // Fracción 0..1 para la barra; sin total → 0.
+  function planProgress(info) {
+    if (!info || typeof info.total !== 'number' || info.total <= 0) return 0;
+    return Math.max(0, Math.min(1, (info.done || 0) / info.total));
+  }
+
+  // DD-25: cómo mostrar `ask` según el estado. null = no se muestra.
+  // mode 'big' (waiting/blocked) o 'small' (idle); busy/done nada.
+  function askView(s) {
+    if (!s || !s.ask || typeof s.ask.text !== 'string' || !s.ask.text) return null;
+    var a = s.ask;
+    var more = typeof a.more === 'number' && a.more > 0 ? a.more : 0;
+    var moreText = more > 0 ? '+' + more + (more === 1 ? ' pregunta' : ' preguntas') : '';
+    if (isWaiting(s.status)) {
+      var label = a.kind === 'tool' ? 'pide permiso:' : a.kind === 'question' ? 'pregunta:' : 'último mensaje:';
+      return { mode: 'big', label: label, text: a.text, more: moreText };
+    }
+    if (s.status === 'idle') return { mode: 'small', label: 'último mensaje:', text: a.text, more: moreText };
+    return null;
+  }
+
+  // DD-22/DD-25: insignia solo con `high`; con count > 0 sin high, solo tooltip.
+  function errorsView(e) {
+    if (!e || typeof e.count !== 'number' || e.count <= 0) return null;
+    var win = e.windowMin || 10;
+    var title = e.count + (e.count === 1 ? ' error' : ' errores') + ' de herramientas en ' + win + ' min';
+    return { badge: e.high ? '⚠ ' + e.count + ' errores en ' + win + ' min' : '', title: title };
+  }
+
+  // Número del favicon: '' = original (0), 1..9 tal cual, 10+ = '9+'.
+  function faviconLabel(n) {
+    if (typeof n !== 'number' || !isFinite(n) || n <= 0) return '';
+    return n >= 10 ? '9+' : String(Math.floor(n));
+  }
+
+  // Filtro por estado del contador: tocar el activo lo quita. Valores: '', 'waiting', 'busy', 'idle'.
+  var STATUS_FILTERS = ['waiting', 'busy', 'idle'];
+  function toggleStatusFilter(current, clicked) {
+    if (STATUS_FILTERS.indexOf(clicked) === -1) return current || '';
+    return current === clicked ? '' : clicked;
+  }
+
+  function matchesStatus(s, f) {
+    if (!f) return true;
+    if (f === 'waiting') return s.status === 'waiting' || s.status === 'blocked';
+    return s.status === f;
   }
 
   function orqLabel(o) {
@@ -133,7 +209,7 @@
     var n = normalizeText(q).trim();
     if (!n) return true;
     var o = s.orq || {};
-    var fields = [s.name, s.title, s.lastPrompt, s.project, o.plan, o.task];
+    var fields = [s.name, s.title, s.lastPrompt, s.project, o.plan, o.task, s.branch, s.plan && s.plan.name];
     // "plan 3" / "PLAN-3" también deberían encontrar: sumamos las etiquetas
     fields.push(orqLabel(s.orq));
     return fields.some(function (f) { return normalizeText(f).indexOf(n) !== -1; });
@@ -185,7 +261,9 @@
     if (typeof module !== 'undefined' && module.exports) {
       module.exports = {
         notifyTargets: notifyTargets, formatTokens: formatTokens, totalTokens: totalTokens,
-        groupByPlan: groupByPlan, orqLabel: orqLabel,
+        groupByPlan: groupByPlan, orqLabel: orqLabel, planKey: planKey, planHeading: planHeading, planProgress: planProgress,
+        askView: askView, errorsView: errorsView, faviconLabel: faviconLabel,
+        toggleStatusFilter: toggleStatusFilter, matchesStatus: matchesStatus,
         formatContext: formatContext, contextTitle: contextTitle, rateTitle: rateTitle,
         planTotals: planTotals, isOldDone: isOldDone, splitOldDone: splitOldDone,
         normalizeText: normalizeText, matchesQuery: matchesQuery,
@@ -230,7 +308,7 @@
   var filters = loadFilters();
 
   function loadFilters() {
-    var f = { project: '', hideDone: false, hideIdle: false };
+    var f = { project: '', hideDone: false, hideIdle: false, status: '' };
     try {
       var raw = localStorage.getItem(STORE_KEY);
       if (raw) {
@@ -238,6 +316,7 @@
         f.project = typeof p.project === 'string' ? p.project : '';
         f.hideDone = !!p.hideDone;
         f.hideIdle = !!p.hideIdle;
+        f.status = STATUS_FILTERS.indexOf(p.status) !== -1 ? p.status : '';
       }
     } catch (e) { /* storage no disponible: seguimos con defaults */ }
     return f;
@@ -328,6 +407,7 @@
       if (filters.project && s.project !== filters.project) return false;
       if (filters.hideDone && st === 'done') return false;
       if (filters.hideIdle && st === 'idle') return false;
+      if (!matchesStatus(s, filters.status)) return false;
       return true;
     });
   }
@@ -338,7 +418,10 @@
 
     var head = el('div', 'card-head');
     head.appendChild(el('div', 'title', s.title || s.name || s.id));
-    head.appendChild(el('span', 'badge s-' + st, STATUS_ICON[st] + ' ' + STATUS_LABEL[st]));
+    var sb = el('span', 'badge s-' + st, STATUS_ICON[st] + ' ' + STATUS_LABEL[st]);
+    var ev = errorsView(s.errors);
+    if (ev && !ev.badge) sb.title = ev.title;
+    head.appendChild(sb);
     c.appendChild(head);
 
     var meta = el('div', 'meta');
@@ -351,6 +434,27 @@
       meta.appendChild(r);
     }
     c.appendChild(meta);
+
+    if (typeof s.branch === 'string' && s.branch) {
+      var br = el('div', 'branch', '⎇ ' + s.branch);
+      br.title = s.branch;
+      c.appendChild(br);
+    }
+
+    if (ev && ev.badge) {
+      var eb = el('span', 'badge errors', ev.badge);
+      eb.title = ev.title;
+      c.appendChild(eb);
+    }
+
+    var av = askView(s);
+    if (av) {
+      var ask = el('div', 'ask ask-' + av.mode);
+      ask.appendChild(el('span', 'ask-label', av.label));
+      ask.appendChild(el('span', 'ask-text', av.text));
+      if (av.more) ask.appendChild(el('span', 'ask-more', av.more));
+      c.appendChild(ask);
+    }
 
     if (s.stale) {
       c.appendChild(el('span', 'badge stale', '⚠ sin actividad ' + ago(s.lastActivityAt)));
@@ -433,6 +537,47 @@
     return c;
   }
 
+  // ---- Favicon con número (DD-25) ----
+
+  var faviconLink = document.querySelector('link[rel="icon"]');
+  var faviconOriginal = faviconLink ? faviconLink.getAttribute('href') : '';
+  var faviconShown = ''; // etiqueta dibujada; '' = original
+
+  function drawFavicon(label) {
+    var cv = document.createElement('canvas');
+    cv.width = 64;
+    cv.height = 64;
+    var ctx = cv.getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = '#d97757';
+    ctx.beginPath();
+    ctx.arc(32, 32, 28, 0, Math.PI * 2);
+    ctx.fill();
+    var w = label.length > 1 ? 40 : 34;
+    ctx.fillStyle = '#dc2626';
+    ctx.beginPath();
+    ctx.arc(64 - w / 2, w / 2, w / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold ' + (label.length > 1 ? 24 : 28) + 'px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, 64 - w / 2, w / 2 + 2);
+    return cv.toDataURL('image/png');
+  }
+
+  // Solo regenera si el número cambió (render corre cada 30 s y en cada snapshot).
+  function updateFavicon(n) {
+    if (!faviconLink) return;
+    var label = faviconLabel(n);
+    if (label === faviconShown) return;
+    faviconShown = label;
+    if (label === '') { faviconLink.setAttribute('href', faviconOriginal); faviconLink.removeAttribute('type'); return; }
+    var url;
+    try { url = drawFavicon(label); } catch (e) { url = null; }
+    if (url) { faviconLink.setAttribute('type', 'image/png'); faviconLink.setAttribute('href', url); }
+  }
+
   function updateProjects() {
     var names = Array.from(new Set(sessions.map(function (s) { return s.project; }).filter(Boolean))).sort();
     if (filters.project && names.indexOf(filters.project) === -1) names.push(filters.project);
@@ -459,6 +604,11 @@
     $('n-waiting').textContent = counts.waiting;
     $('n-busy').textContent = counts.busy;
     $('n-idle').textContent = counts.idle;
+    STATUS_FILTERS.forEach(function (f) {
+      var b = $('c-' + f);
+      b.setAttribute('aria-pressed', filters.status === f ? 'true' : 'false');
+    });
+    updateFavicon(counts.waiting);
     document.title = counts.waiting > 0 ? '(' + counts.waiting + ') esperándote — ' + BASE_TITLE : BASE_TITLE;
 
     var list = sorted(visible(sessions));
@@ -467,13 +617,27 @@
     if (groupByPlanOn) {
       groupByPlan(parts.recent).forEach(function (g) {
         var sec = el('section', 'group');
-        var h = el('h2', 'group-head', g.plan === null ? 'Sin plan' : 'PLAN-' + g.plan);
+        var h = el('h2', 'group-head', planHeading(g));
+        if (g.info && g.info.name) h.title = g.info.name;
         h.appendChild(el('span', 'group-count', g.sessions.length + (g.waiting ? ' · ' + g.waiting + ' esperándote' : '')));
         var pt = planTotals(g.sessions);
         var tot = el('span', 'group-tokens', '🔢 ' + formatTokens(pt.total) + ' tokens · output ' + formatTokens(pt.output));
         tot.title = 'Suma de las sesiones que Claude todavía lista; las borradas con `claude rm` no cuentan.';
         h.appendChild(tot);
         sec.appendChild(h);
+        if (g.info && typeof g.info.total === 'number' && g.info.total > 0) {
+          var bar = el('div', 'progress');
+          bar.setAttribute('role', 'progressbar');
+          bar.setAttribute('aria-label', 'Avance de ' + (g.info.name || planHeading(g)));
+          bar.setAttribute('aria-valuemin', '0');
+          bar.setAttribute('aria-valuemax', String(g.info.total));
+          bar.setAttribute('aria-valuenow', String(g.info.done || 0));
+          bar.setAttribute('aria-valuetext', (g.info.done || 0) + ' de ' + g.info.total + ' tareas hechas');
+          var fill = el('div', 'progress-fill');
+          fill.style.width = Math.round(planProgress(g.info) * 100) + '%';
+          bar.appendChild(fill);
+          sec.appendChild(bar);
+        }
         var inner = el('div', 'grid');
         g.sessions.forEach(function (s) { inner.appendChild(card(s)); });
         sec.appendChild(inner);
@@ -696,6 +860,14 @@
     selProject.addEventListener('change', function () { filters.project = selProject.value; saveFilters(); render(); });
     chkDone.addEventListener('change', function () { filters.hideDone = chkDone.checked; saveFilters(); render(); });
     chkIdle.addEventListener('change', function () { filters.hideIdle = chkIdle.checked; saveFilters(); render(); });
+
+    STATUS_FILTERS.forEach(function (f) {
+      $('c-' + f).addEventListener('click', function () {
+        filters.status = toggleStatusFilter(filters.status, f);
+        saveFilters();
+        render();
+      });
+    });
 
     var chkGroup = $('f-group');
     chkGroup.checked = groupByPlanOn;
