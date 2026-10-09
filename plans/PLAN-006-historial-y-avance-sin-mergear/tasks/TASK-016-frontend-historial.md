@@ -4,7 +4,7 @@
 - **Especialista:** claude-dashboard-worker
 - **Proyecto:** claude-dashboard (`~/personal/claude-dashboard`), rama `main`
 - **Depende de:** contrato §4 del master (no código: el backend va en paralelo)
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -23,15 +23,24 @@ La UI de DD-29: panel de historial y `(N sin mergear)` en el encabezado del plan
 - **Modificar:** `web/app.js`, `web/app.css`, `web/index.html`, `web/app.test.js`, `web/embed.go`, `web/fixture.json` (un plan con `unmerged`)
 
 ## Pasos
-- [ ] **Paso 1** — Lógica pura: escala de barras (máximo del período = 100 %, días en 0 sin barra pero con espacio), día seleccionado, filas por modelo/proyecto.
-- [ ] **Paso 2** — Botón "📊 historial" y panel: 30 barras de output (hoy marcado, `title` con fecha y valor, click selecciona el día, accesibles por teclado), totales del día y tablas; `ready:false` → "calculando historial…" + reintento a los 3 s.
-- [ ] **Paso 3** — `planHeading` con `(N sin mergear)`.
+- [x] **Paso 1** — Lógica pura: escala de barras (máximo del período = 100 %, días en 0 sin barra pero con espacio), día seleccionado, filas por modelo/proyecto.
+- [x] **Paso 2** — Botón "📊 historial" y panel: 30 barras de output (hoy marcado, `title` con fecha y valor, click selecciona el día, accesibles por teclado), totales del día y tablas; `ready:false` → "calculando historial…" + reintento a los 3 s.
+- [x] **Paso 3** — `planHeading` con `(N sin mergear)`.
 
 ## Criterios de aceptación
-- [ ] `node --test web/`: escala (incluye todos en 0 sin dividir por cero), selección de día, encabezado con y sin `unmerged`.
-- [ ] `grep -n innerHTML web/app.js` vacío.
-- [ ] Con `?fixture`: panel de historial en claro y oscuro, 1280 y 360 px, sin scroll horizontal; texto hostil inerte. (Si no podés abrir un navegador, decilo: lo verifica el orquestador.)
-- [ ] `node --check web/app.js`, `node --test web/`, `go test ./...` (el embed compila) en verde y pegados en `Verificado por`.
+- [x] `node --test web/`: escala (incluye todos en 0 sin dividir por cero), selección de día, encabezado con y sin `unmerged`.
+- [x] `grep -n innerHTML web/app.js` vacío.
+- [x] Con `?fixture`: panel de historial en claro y oscuro, 1280 y 360 px, sin scroll horizontal; texto hostil inerte. (Si no podés abrir un navegador, decilo: lo verifica el orquestador.)
+- [x] `node --check web/app.js`, `node --test web/`, `go test ./...` (el embed compila) en verde y pegados en `Verificado por`.
 
 ## Resultado
-<!-- SE LLENA AL CERRAR (estado done/skipped). Vacío mientras esté pending. -->
+- **Commit:** 1e81974 (rama `feature/plan-6-task-016`)
+- **Archivos:** creado `web/fixture-history.json`; modificados `web/app.js`, `web/app.css`, `web/index.html`, `web/app.test.js`, `web/embed.go`, `web/fixture.json` (PLAN-007 con `unmerged: 2`).
+- **Hecho:** funciones puras `historyScale`, `selectDay`, `historyRows` y `planHeading` con `(N sin mergear)` (exportadas, testeadas); botón "📊 historial" y panel (30 barras `<button>` accesibles por teclado, hoy marcado, `title` con fecha y valor, click selecciona día, totales y tablas modelo/proyecto, `ready:false` → "calculando historial…" con reintento a 3 s); Esc cierra.
+- **Verificado por:**
+  - `node --check web/app.js` OK
+  - `node --test web/`: 33 pass, 0 fail
+  - `go vet ./...` y `gofmt -l .` limpios; `go test ./...` OK (el embed compila)
+  - `grep -n innerHTML web/app.js` vacío (solo `textContent`/`createElement`)
+- **NO verificado:** render visual con `?fixture` (claro/oscuro, 1280 y 360 px, sin scroll horizontal, texto hostil inerte) — no abrí navegador; lo verifica el orquestador. Por diseño el texto hostil va solo por `textContent`.
+- **Gotchas:** el fixture trae 7 modelos/proyectos → 5 + "otros" como en el contrato. `server.go`/`main.go` no se tocaron: el backend (`/api/history`, `unmerged`) lo integra el orquestador.
