@@ -19,7 +19,7 @@
 ## 2. Tasks y orden
 | Task | Qué | Especialista | Modelo | Depende de | Estado |
 |------|-----|--------------|--------|------------|--------|
-| **TASK-017** | Frontend: bandeja (abandonadas, franja, lista + detalle, limpieza, teclado, teléfono) | claude-dashboard-worker | sonnet | — | `pending` |
+| **TASK-017** | Frontend: bandeja (abandonadas, franja, lista + detalle, limpieza, teclado, teléfono) | claude-dashboard-worker | sonnet | — | `done` |
 
 ### Paralelismo
 

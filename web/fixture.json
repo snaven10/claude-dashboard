@@ -698,6 +698,67 @@
         "skipped": 2,
         "unknown": 0
       }
+    },
+    {
+      "id": "aba00001",
+      "sessionId": "aba00001-0000-4000-8000-000000000021",
+      "pid": 3021,
+      "cwd": "/home/user/infra",
+      "remote": false,
+      "remoteUrl": null,
+      "stale": false,
+      "lastPrompt": null,
+      "lastAction": null,
+      "orq": null,
+      "tokens": null,
+      "context": null,
+      "rate": null,
+      "ask": null,
+      "errors": null,
+      "branch": null,
+      "plan": null,
+      "kind": "background",
+      "name": "respaldo-nocturno",
+      "project": "infra",
+      "status": "blocked",
+      "waitingFor": "input needed",
+      "startedAt": 1783700712278,
+      "lastActivityAt": null,
+      "title": "Respaldo nocturno de la base"
+    },
+    {
+      "id": "aba00002",
+      "sessionId": "aba00002-0000-4000-8000-000000000022",
+      "pid": 3022,
+      "cwd": "/home/user/demo-web",
+      "remote": false,
+      "remoteUrl": null,
+      "stale": false,
+      "lastPrompt": null,
+      "lastAction": {
+        "kind": "text",
+        "text": "¿Aplico la migración?"
+      },
+      "orq": null,
+      "tokens": null,
+      "context": null,
+      "rate": null,
+      "ask": {
+        "kind": "question",
+        "text": "¿Aplico la migración **ahora**?",
+        "more": 0
+      },
+      "errors": null,
+      "branch": null,
+      "plan": null,
+      "kind": "interactive",
+      "name": "demo-catalogo",
+      "project": "demo-web",
+      "status": "waiting",
+      "waitingFor": "input needed",
+      "startedAt": 1791131112278,
+      "lastActivityAt": 1791217512278,
+      "title": "Sincronizar catálogo legado"
     }
   ]
 }
