@@ -176,7 +176,7 @@
     if (!e || typeof e.count !== 'number' || e.count <= 0) return null;
     var win = e.windowMin || 10;
     var title = e.count + (e.count === 1 ? ' error' : ' errores') + ' de herramientas en ' + win + ' min';
-    return { badge: e.high ? '⚠ ' + e.count + ' errores en ' + win + ' min' : '', title: title };
+    return { badge: e.high ? '⚠\uFE0E ' + e.count + ' errores en ' + win + ' min' : '', title: title };
   }
 
   // Número del favicon: '' = original (0), 1..9 tal cual, 10+ = '9+'.
@@ -214,7 +214,7 @@
   // DD-13: "contexto 412k · compactó 2×"; con warn, aviso explícito. null => ''.
   function formatContext(c) {
     if (!c || typeof c.current !== 'number') return '';
-    if (c.warn) return '⚠ contexto ' + formatTokens(c.current) + ', cerca de compactar';
+    if (c.warn) return '⚠\uFE0E contexto ' + formatTokens(c.current) + ', cerca de compactar';
     var t = 'contexto ' + formatTokens(c.current);
     if (c.compactions > 0) t += ' · compactó ' + c.compactions + '×';
     return t;
@@ -297,7 +297,7 @@
   function resumeWarning(s) {
     if (!s || s.kind !== 'interactive' || s.status === 'done') return '';
     var t = 'Ojo: si esta sesión sigue abierta, --resume abre una segunda copia de la conversación.';
-    if (validRemoteUrl(s.remoteUrl)) t += ' Usá el QR (📱) para continuarla en el teléfono.';
+    if (validRemoteUrl(s.remoteUrl)) t += ' Usá el QR para continuarla en el teléfono.';
     return t;
   }
 
@@ -625,12 +625,12 @@
     var ev = errorsView(s.errors);
     if (ev && ev.badge) out.push({ cls: 'err', text: ev.badge, title: ev.title, pri: 0 });
     if (s.context && s.context.warn) {
-      out.push({ cls: 'warn', text: '⚠ contexto ' + formatTokens(s.context.current), title: contextTitle(s.context), pri: 1 });
+      out.push({ cls: 'warn', text: '⚠\uFE0E contexto ' + formatTokens(s.context.current), title: contextTitle(s.context), pri: 1 });
     }
-    if (s.rate && s.rate.high) out.push({ cls: 'warn', text: '⚡ ritmo inusual', title: rateTitle(s.rate), pri: 2 });
+    if (s.rate && s.rate.high) out.push({ cls: 'warn', text: '⚡\uFE0E ritmo inusual', title: rateTitle(s.rate), pri: 2 });
     if (s.stale) {
       var when = agoFrom(s.lastActivityAt, now);
-      out.push({ cls: 'warn', text: '⚠ sin actividad ' + when, title: 'Sin actividad ' + when, pri: 3 });
+      out.push({ cls: 'warn', text: '⚠\uFE0E sin actividad ' + when, title: 'Sin actividad ' + when, pri: 3 });
     }
     sessionChips(s, now).forEach(function (c) {
       var p = Object.prototype.hasOwnProperty.call(CHIP_PRI_BY_CLS, c.cls) ? CHIP_PRI_BY_CLS[c.cls] : 9;
@@ -667,7 +667,7 @@
 
     var av = st === 'idle' ? askView(s) : null;
     var tooltip = awayLine(s) || (av ? plainText(av.text) : '');
-    if (!tooltip) tooltip = [projText, s.branch ? '⎇ ' + plainText(s.branch) : null].filter(Boolean).join(' · ');
+    if (!tooltip) tooltip = [projText, s.branch ? 'rama ' + plainText(s.branch) : null].filter(Boolean).join(' · ');
 
     var when = agoFrom(s.lastActivityAt || s.startedAt, now);
     return {
@@ -723,7 +723,6 @@
     idle: 'idle',
     done: 'done'
   };
-  var STATUS_ICON = { waiting: '⏳', blocked: '⏳', busy: '⚙', idle: '💤', done: '✔' };
   var RANK = { waiting: 0, blocked: 0, busy: 1, idle: 2, done: 3 };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -774,6 +773,46 @@
     if (cls) n.className = cls;
     if (text != null) n.textContent = text;
     return n;
+  }
+
+  // Íconos propios en SVG (DD-42): no dependen de una fuente de emoji. Trazos dibujados a mano en
+  // una grilla de 16x16; toman el color del texto vía currentColor. Nunca reciben texto de sesión.
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  var ICONS = {
+    history: [['path', { d: 'M3 13V8M8 13V3M13 13V6' }]],
+    remote: [['circle', { cx: '8', cy: '11', r: '1.3', fill: 'currentColor', stroke: 'none' }],
+      ['path', { d: 'M5 8.5a4.2 4.2 0 0 1 6 0M2.8 6.2a7.4 7.4 0 0 1 10.4 0' }]],
+    tokens: [['path', { d: 'M6.2 2.5 4.8 13.5M11.4 2.5 10 13.5M3 6h10.5M2.5 10H13' }]],
+    phone: [['rect', { x: '4.5', y: '1.5', width: '7', height: '13', rx: '1.5' }],
+      ['path', { d: 'M7 12.5h2' }]],
+    branch: [['circle', { cx: '5', cy: '3.5', r: '1.5' }], ['circle', { cx: '5', cy: '12.5', r: '1.5' }],
+      ['circle', { cx: '11', cy: '5', r: '1.5' }], ['path', { d: 'M5 5v6M11 6.5c0 3-6 2-6 4.5' }]]
+  };
+
+  function icon(name) {
+    var svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 16 16');
+    svg.setAttribute('class', 'icon');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '1.6');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    (ICONS[name] || []).forEach(function (part) {
+      var n = document.createElementNS(SVG_NS, part[0]);
+      Object.keys(part[1]).forEach(function (k) { n.setAttribute(k, part[1][k]); });
+      svg.appendChild(n);
+    });
+    return svg;
+  }
+
+  // Nodo con ícono + texto. El texto va siempre por textContent (nodo de texto).
+  function withIcon(node, name, text) {
+    node.appendChild(icon(name));
+    if (text) node.appendChild(document.createTextNode(text));
+    return node;
   }
 
   function ago(ms) {
@@ -1119,11 +1158,11 @@
     var w = el('div', 'chips');
     var ev = errorsView(s.errors);
     if (ev && ev.badge) w.appendChild(chip('err', ev.badge, ev.title));
-    if (s.rate && s.rate.high) w.appendChild(chip('warn', '⚡ ritmo inusual', rateTitle(s.rate)));
+    if (s.rate && s.rate.high) w.appendChild(chip('warn', '⚡\uFE0E ritmo inusual', rateTitle(s.rate)));
     if (!inDetail && s.context && s.context.warn) {
-      w.appendChild(chip('warn', '⚠ contexto ' + formatTokens(s.context.current), contextTitle(s.context)));
+      w.appendChild(chip('warn', '⚠\uFE0E contexto ' + formatTokens(s.context.current), contextTitle(s.context)));
     }
-    if (s.stale) w.appendChild(chip('warn', '⚠ sin actividad ' + ago(s.lastActivityAt)));
+    if (s.stale) w.appendChild(chip('warn', '⚠\uFE0E sin actividad ' + ago(s.lastActivityAt)));
     sessionChips(s, nowMs()).forEach(function (c) {
       var n;
       if (c.lines) {
@@ -1205,7 +1244,8 @@
     if (g.info && g.info.name) h.title = g.info.name;
     t.appendChild(document.createTextNode(' · ' + g.sessions.length + (g.waiting ? ' · ' + g.waiting + ' esperándote' : '')));
     var pt = planTotals(g.sessions);
-    var tot = el('span', 'group-tokens', ' · 🔢 ' + formatTokens(pt.total) + ' tokens · output ' + formatTokens(pt.output));
+    var tot = el('span', 'group-tokens', ' · ');
+    withIcon(tot, 'tokens', ' ' + formatTokens(pt.total) + ' tokens · output ' + formatTokens(pt.output));
     tot.title = 'Suma de las sesiones que Claude todavía lista; las borradas con `claude rm` no cuentan.';
     t.appendChild(tot);
     h.appendChild(t);
@@ -1378,7 +1418,12 @@
       // Renglón 1: título · proyecto · hora + acciones a la derecha. Renglón 2: motivo en una línea.
       var h = el('header');
       h.appendChild(el('strong', null, titleOf(s)));
-      h.appendChild(el('span', 'meta', [s.project, s.branch ? '⎇ ' + s.branch : null].filter(Boolean).join(' · ')));
+      var metaSp = el('span', 'meta', s.project || '');
+      if (s.branch) {
+        if (s.project) metaSp.appendChild(document.createTextNode(' · '));
+        withIcon(metaSp, 'branch', ' ' + s.branch);
+      }
+      h.appendChild(metaSp);
       h.appendChild(el('span', 'help', ago(s.lastActivityAt || s.startedAt)));
       var wv = waitView(s);
       var q = el('div', 'ask-q');
@@ -1393,7 +1438,8 @@
       open.addEventListener('click', function () { select(key, true); });
       a.appendChild(open);
       if (validRemoteUrl(s.remoteUrl)) {
-        var ph = btn('📱');
+        var ph = btn('');
+        ph.appendChild(icon('phone'));
         ph.title = 'Abrir en el teléfono (QR)';
         ph.setAttribute('aria-label', 'Abrir en el teléfono');
         ph.addEventListener('click', function () { qrOpenFor = key; select(key, true); });
@@ -1550,7 +1596,7 @@
 
     var head = el('div', 'detail-head');
     head.appendChild(el('h3', null, titleOf(s)));
-    head.appendChild(el('span', 'pill s-' + st, STATUS_ICON[st] + ' ' + STATUS_LABEL[st]));
+    head.appendChild(el('span', 'pill s-' + st, STATUS_LABEL[st]));
     nodes.push(head);
 
     var meta = el('div', 'meta');
@@ -1560,14 +1606,14 @@
     var perm = permissionChip(s);
     if (perm) meta.appendChild(el('span', null, 'permisos: ' + perm));
     if (s.remote) {
-      var rm = el('span', null, '📡 remoto');
+      var rm = withIcon(el('span'), 'remote', ' remoto');
       rm.title = 'Sesión con bridge remoto';
       meta.appendChild(rm);
     }
     nodes.push(meta);
 
     if (typeof s.branch === 'string' && s.branch) {
-      var br = el('div', 'branch', '⎇ ' + s.branch);
+      var br = withIcon(el('div', 'branch'), 'branch', ' ' + s.branch);
       br.title = s.branch;
       nodes.push(br);
     }
@@ -1625,7 +1671,8 @@
 
     if (s.tokens) {
       var tk = s.tokens;
-      var tt = el('div', 'tokens', '🔢 ' + formatTokens(totalTokens(tk)) + ' tokens' + (tk.model ? ' · ' + tk.model : ''));
+      var tt = withIcon(el('div', 'tokens'), 'tokens',
+        ' ' + formatTokens(totalTokens(tk)) + ' tokens' + (tk.model ? ' · ' + tk.model : ''));
       tt.title = 'input ' + (tk.input || 0) + ' · output ' + (tk.output || 0) +
         ' · cache leído ' + (tk.cacheRead || 0) + ' · cache creado ' + (tk.cacheCreation || 0);
       nodes.push(tt);
@@ -1684,7 +1731,8 @@
     var mode = phoneMode(s);
     var actions = el('div', 'actions');
     if (mode === 'qr') {
-      var ph = btn('📱 abrir en el teléfono');
+      var ph = btn('');
+      withIcon(ph, 'phone', ' abrir en el teléfono');
       ph.dataset.act = 'qr';
       ph.setAttribute('aria-expanded', qrOpenFor === key ? 'true' : 'false');
       ph.addEventListener('click', function () { qrOpenFor = qrOpenFor === key ? '' : key; render(); });
@@ -1698,7 +1746,8 @@
 
     if (mode === 'qr' && qrOpenFor === key) nodes.push(qrBox(s));
     if (mode === 'enable') {
-      nodes.push(el('div', 'help', '📱 Para abrirla en el teléfono, activalo escribiendo /remote-control (o /rc) en esa sesión; el QR aparece solo en ~3 s.'));
+      nodes.push(withIcon(el('div', 'help'), 'phone',
+        ' Para abrirla en el teléfono, activalo escribiendo /remote-control (o /rc) en esa sesión; el QR aparece solo en ~3 s.'));
     }
     var warn = resumeWarning(s);
     if (warn) nodes.push(el('div', 'help', warn));
