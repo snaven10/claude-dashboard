@@ -4,7 +4,7 @@
 - **Especialista:** claude-dashboard-worker (sonnet)
 - **Proyecto:** claude-dashboard (raíz del repo), rama `feature/plan-10-task-025` desde `main` (con TASK-024 mergeada)
 - **Depende de:** TASK-024
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -77,10 +77,33 @@ Implementa DD-38 y DD-39 del master.
   extenderlo a `.ask-card` para no perder el foco en cada snapshot.
 
 ## Resultado
-<!-- SE LLENA AL CERRAR (estado done/skipped). Vacío mientras esté pending. -->
-- **Estado final:**
-- **Resumen:**
-- **Archivos tocados:**
-- **Verificado por:**
-- **Desviaciones:**
-- **Riesgos abiertos / siguiente:**
+- **Estado final:** done (commit de código `9f06741`)
+- **Resumen:** `statusGroups(list, now)` y `listTotals(list, now)` puras (con tests). `renderList` pinta
+  `Trabajando (N)` / `Idle (N)` (con `role="group"` y `aria-label`) y `Terminadas (N)` /
+  `Abandonadas (N)` plegables (mismo `localStorage`, `aria-expanded`). Con "agrupar por plan" se
+  mantienen `groupHead`, orden por estado dentro del plan y fold de terminadas viejas + abandonadas.
+  Botones `N terminadas` / `N abandonadas` en el encabezado (sin `aria-pressed` ni teclas; despliegan y
+  hacen `scrollIntoView`). Tarjetas de la bandeja con `data-key`, `tabindex=0`, `role=option`,
+  `aria-selected`, borde de selección y click; `navKeys` = bandeja + filas; `rowByKey` y la
+  recuperación de foco cubren `.ask-card`. Lista vacía con sesiones esperando muestra "Las N sesiones
+  que te esperan están arriba, en Te esperan".
+- **Archivos tocados:** `web/app.js`, `web/app.css`, `web/index.html`, `web/app.test.js`
+- **Verificado por:** `node --check web/app.js` ok; `node --test web/` 66/66 pass (5 tests nuevos);
+  `rg innerHTML web/app.js` vacío; `gofmt -l .` vacío; `go vet ./...` ok; `go test -race ./...` ok.
+  Medición con `?fixture=lista` en Chromium headless (copia temporal con script de medición, no
+  commiteada): 1440 de ancho → 18 visibles (3 tarjetas + 7 Trabajando + 8 Idle), encabezados
+  `Terminadas (21)` y `Abandonadas (4)` dentro del viewport, botones `21 terminadas` / `4 abandonadas`,
+  0 claves de la bandeja repetidas en `#rows`, sin scroll horizontal. Ventana de 390 no se pudo
+  lograr (headless fija mínimo 500 px): 500 px sin scroll horizontal, 8 visibles. **No ejecutado:**
+  j/k, Enter en teléfono real, 1/2/3, "agrupar por plan" y claro/oscuro en navegador (solo razonado
+  contra el código; los mide TASK-029).
+- **Desviaciones:** (1) El criterio "≥ 25 sesiones visibles" es inalcanzable con el fixture y las
+  terminadas plegadas: solo hay 18 sesiones no terminadas ni abandonadas; las 18 se ven. Los 25
+  requerirían desplegar Terminadas (DD-38 las pliega por defecto). (2) El mensaje del Paso 5 se
+  muestra siempre que la lista queda vacía y hay waiting visibles (no solo con el filtro `1`), porque
+  "No hay sesiones" sería falso en ese caso. (3) Los botones del encabezado cuentan sobre las sesiones
+  visibles tras filtros (con "ocultar done" no ofrecen un grupo vacío); con "agrupar por plan"
+  `N terminadas` cuenta solo las viejas, que son las del fold.
+- **Riesgos abiertos / siguiente:** TASK-026 debe cambiar `sessionKey` por `rowKey` también en
+  `inboxKeys` y en los `data-key` de las tarjetas. El `role="option"` de las tarjetas contiene botones
+  (igual que las filas): si lectores de pantalla se quejan, revisar en TASK-029.
