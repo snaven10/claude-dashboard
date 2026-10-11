@@ -467,6 +467,8 @@
   var GROUP_KEY = 'claude-dashboard.groupByPlan';
   var OLD_KEY = 'claude-dashboard.showOldDone';
   var FIXTURE = new URLSearchParams(location.search).has('fixture');
+  // ?fixture=lista carga fixture-lista.json (43 sesiones); cualquier otro valor, fixture.json.
+  var FIXTURE_FILE = new URLSearchParams(location.search).get('fixture') === 'lista' ? 'fixture-lista.json' : 'fixture.json';
 
   var STATUS_LABEL = {
     waiting: 'esperándote',
@@ -1479,10 +1481,10 @@
     setInterval(loadToday, 60000);
 
     if (FIXTURE) {
-      fetch('fixture.json')
+      fetch(FIXTURE_FILE)
         .then(function (r) { return r.json(); })
         .then(function (d) { setSnapshot(d); setConn(true); })
-        .catch(function () { setConn(false); $('empty').textContent = 'No se pudo cargar fixture.json (¿servido por HTTP?)'; $('empty').hidden = false; });
+        .catch(function () { setConn(false); $('empty').textContent = 'No se pudo cargar ' + FIXTURE_FILE + ' (¿servido por HTTP?)'; $('empty').hidden = false; });
       return;
     }
 
