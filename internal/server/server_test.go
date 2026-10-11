@@ -1033,9 +1033,26 @@ func TestIsRemoteByListenerAndSameSnapshot(t *testing.T) {
 		return fakeSessions(2), nil
 	})
 	s2.Interval = 20 * time.Millisecond
+	// Desde TASK-031 el listener remoto exige cookie de dispositivo (DD-47).
+	cookie := enableRemote(t, s2)
 	local, rem, done, cancel := serveOn(t, s2, true)
 	defer cancel()
-	a, b := get(local+"/api/sessions"), get(rem+"/api/sessions")
+	getRemote := func(u string) string {
+		t.Helper()
+		req, _ := http.NewRequest("GET", u, nil)
+		req.AddCookie(&http.Cookie{Name: "cd_device", Value: cookie})
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var sb strings.Builder
+		if _, err := bufio.NewReader(resp.Body).WriteTo(&sb); err != nil {
+			t.Fatal(err)
+		}
+		return sb.String()
+	}
+	a, b := get(local+"/api/sessions"), getRemote(rem+"/api/sessions")
 	if a == "" || a != b {
 		t.Fatalf("snapshots distintos:\n%s\n%s", a, b)
 	}
