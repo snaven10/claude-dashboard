@@ -659,3 +659,50 @@ test('rowView sobre el fixture de lista: ninguna fila revienta y el tope se resp
     assert.ok(v.ariaLabel.indexOf(v.when) !== -1);
   });
 });
+
+// ---- PLAN-010 / TASK-025: grupos por estado (DD-38, DD-39) ----
+
+const GNOW = 1_800_000_000_000;
+const GHOUR = 3600 * 1000;
+const gat = (hoursAgo) => ({ lastActivityAt: GNOW - hoursAgo * GHOUR });
+
+test('statusGroups: la waiting no abandonada no aparece en ningún grupo', () => {
+  const list = [s('w', 'waiting', gat(1)), s('k', 'blocked', gat(2)), s('b', 'busy', gat(1)), s('i', 'idle', gat(1))];
+  const groups = A.statusGroups(list, GNOW);
+  assert.deepStrictEqual(groups.map((g) => g.id), ['busy', 'idle']);
+  const ids = groups.flatMap((g) => g.sessions.map((x) => x.id));
+  assert.deepStrictEqual(ids, ['b', 'i']);
+});
+
+test('statusGroups: una waiting de hace 3 días va a abandonadas', () => {
+  const groups = A.statusGroups([s('old', 'waiting', gat(72)), s('blk', 'blocked', gat(30))], GNOW);
+  assert.deepStrictEqual(groups.map((g) => g.id), ['abandoned']);
+  assert.deepStrictEqual(groups[0].sessions.map((x) => x.id), ['old', 'blk']);
+  assert.strictEqual(groups[0].label, 'Abandonadas');
+});
+
+test('statusGroups: terminadas recientes antes que las viejas, ambas en "Terminadas"', () => {
+  const list = [s('viejo', 'done', gat(48)), s('nuevo', 'done', gat(2)), s('i', 'idle', gat(1))];
+  const groups = A.statusGroups(list, GNOW);
+  const done = groups.find((g) => g.id === 'done');
+  assert.strictEqual(done.label, 'Terminadas');
+  assert.deepStrictEqual(done.sessions.map((x) => x.id), ['nuevo', 'viejo']);
+});
+
+test('statusGroups: orden fijo, sin grupos vacíos, tolera null', () => {
+  const list = [s('d', 'done', gat(1)), s('i', 'idle', gat(1)), s('b', 'busy', gat(1)), s('a', 'waiting', gat(100))];
+  assert.deepStrictEqual(A.statusGroups(list, GNOW).map((g) => g.id), ['busy', 'idle', 'done', 'abandoned']);
+  assert.deepStrictEqual(A.statusGroups([s('d', 'done', gat(1))], GNOW).map((g) => g.id), ['done']);
+  assert.deepStrictEqual(A.statusGroups([], GNOW), []);
+  assert.deepStrictEqual(A.statusGroups(null, GNOW), []);
+});
+
+test('listTotals: cuenta terminadas (todas) y abandonadas; las waiting vivas no cuentan', () => {
+  const list = [
+    s('d1', 'done', gat(1)), s('d2', 'done', gat(50)), s('d3', 'done'),
+    s('a1', 'waiting', gat(30)), s('a2', 'blocked', gat(90)),
+    s('w', 'waiting', gat(1)), s('b', 'busy', gat(1)),
+  ];
+  assert.deepStrictEqual(A.listTotals(list, GNOW), { done: 3, abandoned: 2 });
+  assert.deepStrictEqual(A.listTotals(null, GNOW), { done: 0, abandoned: 0 });
+});
