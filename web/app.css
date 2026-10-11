@@ -374,3 +374,13 @@ button.counter-link b { font-size: 1rem; color: var(--fg); }
 .links { display: flex; flex-wrap: wrap; gap: 4px 12px; min-width: 0; }
 .links .section-lbl { flex-basis: 100%; }
 .links a { color: var(--accent, var(--busy)); overflow-wrap: anywhere; min-width: 0; }
+
+/* DD-40: chip "×N" de repetidos y sección "Copias" del detalle */
+.chip.rep { background: var(--border); color: var(--fg); font-weight: 700; flex-shrink: 0; }
+.copies { display: flex; flex-direction: column; gap: 2px; }
+.copy-item { display: flex; gap: 10px; align-items: baseline; width: 100%; text-align: left; padding: 3px 8px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: inherit; font: inherit; font-size: 0.82rem; cursor: pointer; }
+.copy-item:hover { background: var(--idle-bg); }
+.copy-item.current { border-color: var(--accent); font-weight: 600; }
+.copy-st { font-weight: 600; }
+.copy-when, .copy-pid { color: var(--muted); }
+.copy-now { margin-left: auto; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; }

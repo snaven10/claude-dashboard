@@ -5,16 +5,31 @@
 
   function isWaiting(st) { return st === 'waiting' || st === 'blocked'; }
 
-  function sessionKey(s) { return s.sessionId || s.id; }
+  // DD-40: id de la conversación (sin PID). Dos procesos con el mismo sessionId comparten esto.
+  function convoKey(s) { return s.sessionId || s.id; }
+
+  // DD-40: clave única de fila: conversación + PID. Background terminadas pueden traer pid 0.
+  function rowKey(s) { return convoKey(s) + (s.pid > 0 ? '#' + s.pid : ''); }
+
+  // Resuelve una clave guardada a una sesión. Exacta primero; si la clave vieja no trae '#',
+  // cae a la primera sesión con ese sessionId (migración de selecciones guardadas).
+  function resolveSession(list, key) {
+    if (!Array.isArray(list) || !key) return null;
+    for (var i = 0; i < list.length; i++) if (rowKey(list[i]) === key) return list[i];
+    if (key.indexOf('#') === -1) {
+      for (var j = 0; j < list.length; j++) if (convoKey(list[j]) === key) return list[j];
+    }
+    return null;
+  }
 
   // Sesiones a notificar entre dos snapshots: las que pasaron a waiting/blocked.
   // prev === null/undefined = primer snapshot de la página: no notifica nada (DD-12).
   function notifyTargets(prev, next) {
     if (!Array.isArray(prev) || !Array.isArray(next)) return [];
     var before = {};
-    prev.forEach(function (s) { before[sessionKey(s)] = s.status; });
+    prev.forEach(function (s) { before[rowKey(s)] = s.status; });
     return next.filter(function (s) {
-      return isWaiting(s.status) && !isWaiting(before[sessionKey(s)]);
+      return isWaiting(s.status) && !isWaiting(before[rowKey(s)]);
     });
   }
 
@@ -358,6 +373,71 @@
     });
   }
 
+  // DD-40: colapso de repetidos. Devuelve [{ head, copies }] en el orden de entrada (la entrada
+  // ocupa el lugar del primer miembro). `copies` son TODOS los miembros del grupo (incluida la
+  // head), en orden de entrada; N del chip "×N" = copies.length. head = la de actividad más
+  // reciente. Solo colapsa en idle/done/abandoned, con mismo cwd y mismo título NO vacío
+  // (s.title, nunca el respaldo name/id) normalizado.
+  var COLLAPSIBLE = { idle: true, done: true, abandoned: true };
+
+  function repeatIdentity(s) {
+    if (!s || !s.cwd) return '';
+    var t = normalizeText(plainText(s.title)).trim();
+    return t ? s.cwd + '\u0000' + t : '';
+  }
+
+  function collapseRepeats(sessions, groupId) {
+    var list = Array.isArray(sessions) ? sessions : [];
+    var can = !!COLLAPSIBLE[groupId];
+    var out = [];
+    var byId = {};
+    list.forEach(function (s) {
+      var id = can ? repeatIdentity(s) : '';
+      if (id && Object.prototype.hasOwnProperty.call(byId, id)) {
+        byId[id].copies.push(s);
+        return;
+      }
+      var e = { head: s, copies: [s] };
+      out.push(e);
+      if (id) byId[id] = e;
+    });
+    var at = function (s) { return s.lastActivityAt || s.startedAt || 0; };
+    out.forEach(function (e) {
+      e.copies.forEach(function (c) { if (at(c) > at(e.head)) e.head = c; });
+    });
+    return out;
+  }
+
+  // Id de grupo de estado de una sesión (como statusGroups), o '' si vive solo en la bandeja.
+  function groupIdOf(s, now) {
+    if (isWaiting(s.status)) return isAbandoned(s, now) ? 'abandoned' : '';
+    if (s.status === 'busy') return 'busy';
+    if (s.status === 'done') return 'done';
+    return 'idle';
+  }
+
+  // Colapso sobre una lista que mezcla estados (agrupar por plan): colapsa por estado y
+  // devuelve las entradas en el orden de aparición del primer miembro.
+  function collapseMixed(sessions, now) {
+    var list = Array.isArray(sessions) ? sessions : [];
+    var pos = new Map();
+    list.forEach(function (s, i) { pos.set(s, i); });
+    var buckets = {};
+    var order = [];
+    list.forEach(function (s) {
+      var g = groupIdOf(s, now);
+      if (!buckets[g]) { buckets[g] = []; order.push(g); }
+      buckets[g].push(s);
+    });
+    var out = [];
+    order.forEach(function (g) {
+      collapseRepeats(buckets[g], g).forEach(function (e) {
+        out.push({ e: e, i: Math.min.apply(null, e.copies.map(function (c) { return pos.get(c); })) });
+      });
+    });
+    return out.sort(function (a, b) { return a.i - b.i; }).map(function (x) { return x.e; });
+  }
+
   // Números del encabezado de la página: terminadas (todas) y abandonadas.
   function listTotals(list, now) {
     var t = { done: 0, abandoned: 0 };
@@ -533,6 +613,12 @@
     var project = opts.projectFilter ? null : (projText || null);
 
     var all = rowChipCandidates(s, now);
+    // DD-40: "×N" entra primero y cuenta para el tope de chips.
+    var copies = typeof opts.copies === 'number' ? Math.floor(opts.copies) : 0;
+    if (copies > 1) {
+      all.unshift({ cls: 'rep', text: '×' + copies, pri: -1,
+        title: copies + ' sesiones con el mismo título en esta carpeta' });
+    }
     var chips = all.slice(0, max);
     var rest = all.slice(max);
 
@@ -562,6 +648,7 @@
         rowView: rowView, agoFrom: agoFrom,
         isAbandoned: isAbandoned, counts: counts, inboxItems: inboxItems, splitAbandoned: splitAbandoned,
         statusGroups: statusGroups, listTotals: listTotals,
+        rowKey: rowKey, resolveSession: resolveSession, collapseRepeats: collapseRepeats, collapseMixed: collapseMixed,
         stepSelection: stepSelection, plainText: plainText, oneLine: oneLine, todayView: todayView,
         notifyTargets: notifyTargets, formatTokens: formatTokens, totalTokens: totalTokens,
         groupByPlan: groupByPlan, orqLabel: orqLabel, planKey: planKey, planHeading: planHeading, planProgress: planProgress,
@@ -804,7 +891,7 @@
       try {
         var n = new Notification((s.title || s.name || s.id) + ' — esperándote', {
           body: (s.project ? s.project + ': ' : '') + (s.waitingFor || (s.lastAction && s.lastAction.text) || 'necesita tu atención'),
-          tag: 'claude-dashboard-' + sessionKey(s)
+          tag: 'claude-dashboard-' + rowKey(s)
         });
         n.onclick = function () { window.focus(); n.close(); };
       } catch (e) { /* ignorar */ }
@@ -1010,22 +1097,39 @@
     return w.childNodes.length ? w : null;
   }
 
-  function row(s) {
-    var key = sessionKey(s);
+  // Entradas del colapso del último renderList: clave de cualquier miembro → entrada { head, copies }.
+  // Solo las que tienen más de una copia. Lo usan el detalle ("Copias") y j/k.
+  var collapsedBy = {};
+
+  function noteEntry(e) {
+    if (e.copies.length > 1) e.copies.forEach(function (c) { collapsedBy[rowKey(c)] = e; });
+  }
+
+  // Clave de la fila visible que representa a `key` (la head si es una copia).
+  function visibleKeyOf(key) {
+    var e = collapsedBy[key];
+    return e ? rowKey(e.head) : key;
+  }
+
+  function row(e) {
+    var s = e.head;
+    var key = rowKey(s);
+    var nCopies = e.copies.length;
+    var isSel = e.copies.some(function (c) { return rowKey(c) === selectedKey; });
     var st = statusOf(s);
     var r = el('button', 'row s-' + st);
     r.type = 'button';
     r.setAttribute('role', 'option');
     r.dataset.key = key;
-    r.setAttribute('aria-selected', key === selectedKey ? 'true' : 'false');
+    r.setAttribute('aria-selected', isSel ? 'true' : 'false');
     var dot = el('span', 'dot d-' + st);
     dot.setAttribute('aria-hidden', 'true');
     r.appendChild(dot);
 
     // Un renglón (DD-37): punto · título · proyecto · chips · hora. El estado va en aria-label.
-    var v = rowView(s, { now: nowMs(), projectFilter: filters.project, maxChips: isPhone() ? 1 : 2 });
+    var v = rowView(s, { now: nowMs(), projectFilter: filters.project, maxChips: isPhone() ? 1 : 2, copies: nCopies });
     r.title = v.tooltip;
-    r.setAttribute('aria-label', v.ariaLabel);
+    r.setAttribute('aria-label', v.ariaLabel + (nCopies > 1 ? ', ' + nCopies + ' sesiones con el mismo título' : ''));
     r.appendChild(el('span', 'row-title', v.title));
     if (v.project) r.appendChild(el('span', 'row-proj', v.project));
     if (v.chips.length || v.extra) {
@@ -1082,17 +1186,26 @@
 
   // Grupo plegable (terminadas / abandonadas, DD-38): el encabezado es una fila completa con
   // contador, visible aunque esté plegado. `id` es el ancla de los botones del encabezado de página.
-  function fold(id, label, title, open, onToggle, items) {
+  // `entries` = [{ head, copies }] (colapso DD-40); el contador cuenta todas las sesiones.
+  function entriesTotal(entries) {
+    var n = 0;
+    entries.forEach(function (e) { n += e.copies.length; });
+    return n;
+  }
+
+  function fold(id, label, title, open, onToggle, entries) {
+    var total = entriesTotal(entries);
     var sec = el('div', 'fold');
     sec.id = id;
     sec.setAttribute('role', 'group');
-    sec.setAttribute('aria-label', label + ', ' + sessionsLabel(items.length));
-    var tg = btn((open ? '▾ ' : '▸ ') + label + ' (' + items.length + ')', 'fold-toggle');
+    sec.setAttribute('aria-label', label + ', ' + sessionsLabel(total));
+    var tg = btn((open ? '▾ ' : '▸ ') + label + ' (' + total + ')', 'fold-toggle');
     tg.setAttribute('aria-expanded', open ? 'true' : 'false');
     if (title) tg.title = title;
     tg.addEventListener('click', onToggle);
     sec.appendChild(tg);
-    if (open) items.forEach(function (s) { navKeys.push(sessionKey(s)); sec.appendChild(row(s)); });
+    entries.forEach(noteEntry);
+    if (open) entries.forEach(function (e) { navKeys.push(rowKey(e.head)); sec.appendChild(row(e)); });
     return sec;
   }
 
@@ -1105,7 +1218,11 @@
     h.appendChild(el('strong', null, g.label));
     h.appendChild(document.createTextNode(' (' + g.sessions.length + ')'));
     sec.appendChild(h);
-    g.sessions.forEach(function (s) { navKeys.push(sessionKey(s)); sec.appendChild(row(s)); });
+    collapseRepeats(g.sessions, g.id).forEach(function (e) {
+      noteEntry(e);
+      navKeys.push(rowKey(e.head));
+      sec.appendChild(row(e));
+    });
     return sec;
   }
 
@@ -1128,6 +1245,7 @@
     groups.forEach(function (g) { by[g.id] = g; });
     var nodes = [];
     navKeys = inboxKeys.slice(); // DD-39: la bandeja entra primero en j/k
+    collapsedBy = {};
     var listed = 0;
     groups.forEach(function (g) { listed += g.sessions.length; });
     var totals = listTotals(vis, now);
@@ -1140,22 +1258,29 @@
       var live = [].concat(by.busy ? by.busy.sessions : [], by.idle ? by.idle.sessions : [], doneParts.recent);
       groupByPlan(live).forEach(function (g) {
         nodes.push(groupHead(g));
-        g.sessions.forEach(function (s) { navKeys.push(sessionKey(s)); nodes.push(row(s)); });
+        collapseMixed(g.sessions, now).forEach(function (e) {
+          noteEntry(e);
+          navKeys.push(rowKey(e.head));
+          nodes.push(row(e));
+        });
       });
       doneShown = doneParts.old.length;
       if (doneParts.old.length) {
-        nodes.push(fold('grp-done', 'Terminadas hace más de 1 día', '', showOldOn, toggleDone, doneParts.old));
+        nodes.push(fold('grp-done', 'Terminadas hace más de 1 día', '', showOldOn, toggleDone,
+          collapseRepeats(doneParts.old, 'done')));
       }
     } else {
       groups.forEach(function (g) {
         if (g.id === 'busy' || g.id === 'idle') nodes.push(statusSection(g));
-        else if (g.id === 'done') nodes.push(fold('grp-done', g.label, '', showOldOn, toggleDone, g.sessions));
+        else if (g.id === 'done') {
+          nodes.push(fold('grp-done', g.label, '', showOldOn, toggleDone, collapseRepeats(g.sessions, 'done')));
+        }
       });
     }
     if (abn.length) {
       nodes.push(fold('grp-abandoned', 'Abandonadas',
         'Esperan hace más de 24 h. No cuentan en el contador ni en los avisos; no se borra nada.',
-        showAbandonedOn, toggleAbandoned, abn));
+        showAbandonedOn, toggleAbandoned, collapseRepeats(abn, 'abandoned')));
     }
 
     // Botones del encabezado de página (no son filtros).
@@ -1187,7 +1312,7 @@
 
   function renderInbox(now) {
     var items = inboxItems(sessions, now);
-    inboxKeys = items.map(sessionKey);
+    inboxKeys = items.map(rowKey);
     $('inbox-title').textContent = 'Te esperan' + (items.length ? ' (' + items.length + ')' : '');
     var box = $('inbox-items');
     box.parentNode.classList.toggle('empty', !items.length); // vacía: una sola línea, deja lugar a la lista
@@ -1196,7 +1321,7 @@
       return;
     }
     box.replaceChildren.apply(box, items.map(function (s) {
-      var key = sessionKey(s);
+      var key = rowKey(s);
       var c = el('article', 'ask-card');
       // Navegable como una fila (DD-39): data-key, foco, selección y click fuera de sus botones.
       c.setAttribute('role', 'option');
@@ -1263,13 +1388,12 @@
   // ---- Detalle ----
 
   function selectedSession() {
-    for (var i = 0; i < sessions.length; i++) if (sessionKey(sessions[i]) === selectedKey) return sessions[i];
-    return null;
+    return resolveSession(sessions, selectedKey);
   }
 
   // La línea de tiempo se pide al seleccionar y cuando cambia lastActivityAt (no en cada snapshot).
   function ensureTimeline(s) {
-    var key = sessionKey(s);
+    var key = rowKey(s);
     var at = s.lastActivityAt || 0;
     var t = timeline;
     if (t.key === key && t.at === at) return;
@@ -1379,7 +1503,7 @@
 
   function buildDetail(d, s) {
     var st = statusOf(s);
-    var key = sessionKey(s);
+    var key = rowKey(s);
     var nodes = [];
 
     var back = btn('← volver a la lista', 'back');
@@ -1489,6 +1613,28 @@
       nodes.push(links);
     }
 
+    // DD-40: copias de la misma conversación colapsadas en una fila.
+    var entry = collapsedBy[key];
+    if (entry && entry.copies.length > 1) {
+      var cps = el('div', 'copies');
+      cps.appendChild(el('span', 'section-lbl', 'Copias (' + entry.copies.length + ')'));
+      entry.copies.forEach(function (c) {
+        var ck = rowKey(c);
+        var cur = ck === key;
+        var b = btn('', 'copy-item' + (cur ? ' current' : ''));
+        b.dataset.copy = ck;
+        b.setAttribute('aria-pressed', cur ? 'true' : 'false');
+        var cst = statusOf(c);
+        b.appendChild(el('span', 'copy-st s-' + cst, STATUS_LABEL[cst]));
+        b.appendChild(el('span', 'copy-when', ago(c.lastActivityAt || c.startedAt)));
+        b.appendChild(el('span', 'copy-pid num', c.pid > 0 ? 'PID ' + c.pid : 'sin PID'));
+        if (cur) b.appendChild(el('span', 'copy-now', 'actual'));
+        b.addEventListener('click', function () { select(ck, false); });
+        cps.appendChild(b);
+      });
+      nodes.push(cps);
+    }
+
     var tl = el('div', 'tl-wrap');
     tl.appendChild(el('span', 'section-lbl', 'Línea de tiempo'));
     tl.appendChild(timelineNode());
@@ -1524,8 +1670,9 @@
     var s = selectedSession();
     if (s && (!isPhone() || phoneDetail)) ensureTimeline(s);
     var minute = s ? Math.floor((nowMs() - (s.lastActivityAt || s.startedAt || 0)) / 60000) : 0;
-    var sig = JSON.stringify([s, minute, s ? turnMinutes(s, nowMs()) : null, qrOpenFor === (s && sessionKey(s)), s ? expanded.has(s.id) : false,
-      timeline.key, timeline.version, timeline.status]);
+    var ent = s ? collapsedBy[rowKey(s)] : null;
+    var sig = JSON.stringify([s, minute, s ? turnMinutes(s, nowMs()) : null, qrOpenFor === (s && rowKey(s)), s ? expanded.has(s.id) : false,
+      timeline.key, timeline.version, timeline.status, ent ? ent.copies : null]);
     if (sig === detailSig) return;
     detailSig = sig;
     var scroll = d.scrollTop;
@@ -1563,6 +1710,10 @@
     updateFavicon(c.waiting);
     document.title = c.waiting > 0 ? '(' + c.waiting + ') esperándote — ' + BASE_TITLE : BASE_TITLE;
 
+    // Selección vieja sin '#pid' (localStorage): se migra a la clave exacta de la sesión resuelta.
+    var cur = selectedSession();
+    if (cur && rowKey(cur) !== selectedKey) { selectedKey = rowKey(cur); saveSelected(selectedKey); }
+
     var ae = document.activeElement;
     var focusKey = opts.focusKey || (ae && ae.classList && (ae.classList.contains('row') || ae.classList.contains('ask-card')) ? ae.dataset.key : '');
     var y = window.scrollY;
@@ -1592,7 +1743,7 @@
     selectedKey = key;
     saveSelected(key);
     if (open && isPhone()) phoneDetail = true;
-    render({ focusKey: key });
+    render({ focusKey: visibleKeyOf(key) });
     if (open && isPhone()) window.scrollTo(0, 0);
   }
 
@@ -1616,7 +1767,7 @@
     if (typing || !$('history').hidden) return;
     var k = ev.key;
     if (k === 'j' || k === 'ArrowDown' || k === 'k' || k === 'ArrowUp') {
-      var next = stepSelection(navKeys, selectedKey, k === 'j' || k === 'ArrowDown' ? 1 : -1);
+      var next = stepSelection(navKeys, visibleKeyOf(selectedKey), k === 'j' || k === 'ArrowDown' ? 1 : -1);
       if (next === null) return;
       ev.preventDefault();
       if (next !== selectedKey) { selectedKey = next; saveSelected(next); }
