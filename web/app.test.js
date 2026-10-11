@@ -706,3 +706,96 @@ test('listTotals: cuenta terminadas (todas) y abandonadas; las waiting vivas no 
   assert.deepStrictEqual(A.listTotals(list, GNOW), { done: 3, abandoned: 2 });
   assert.deepStrictEqual(A.listTotals(null, GNOW), { done: 0, abandoned: 0 });
 });
+
+// ---- PLAN-010 / TASK-026: clave única y colapso "×N" (DD-40) ----
+
+const cs = (id, status, extra) => Object.assign({ id, sessionId: id, status, cwd: '/home/user/api-backend' }, extra);
+
+test('rowKey: gemelos con el mismo sessionId y distinto PID tienen claves distintas', () => {
+  const a = { id: 'x1', sessionId: 'abc', pid: 100 };
+  const b = { id: 'x2', sessionId: 'abc', pid: 200 };
+  assert.strictEqual(A.rowKey(a), 'abc#100');
+  assert.notStrictEqual(A.rowKey(a), A.rowKey(b));
+});
+
+test('rowKey: pid 0 o ausente → sin sufijo; sin sessionId cae al id', () => {
+  assert.strictEqual(A.rowKey({ id: 'x', sessionId: 'abc', pid: 0 }), 'abc');
+  assert.strictEqual(A.rowKey({ id: 'x', sessionId: 'abc' }), 'abc');
+  assert.strictEqual(A.rowKey({ id: 'only', pid: 7 }), 'only#7');
+});
+
+test('resolveSession: clave exacta; la vieja sin # cae a la primera con ese sessionId', () => {
+  const list = [{ id: 'a', sessionId: 'abc', pid: 1 }, { id: 'b', sessionId: 'abc', pid: 2 }];
+  assert.strictEqual(A.resolveSession(list, 'abc#2').id, 'b');
+  assert.strictEqual(A.resolveSession(list, 'abc').id, 'a');
+  assert.strictEqual(A.resolveSession(list, 'abc#9'), null);
+  assert.strictEqual(A.resolveSession(list, ''), null);
+});
+
+test('notifyTargets: gemelos de mismo sessionId no se confunden', () => {
+  const prev = [{ id: 'a', sessionId: 'abc', pid: 1, status: 'busy' }, { id: 'b', sessionId: 'abc', pid: 2, status: 'waiting' }];
+  const next = [{ id: 'a', sessionId: 'abc', pid: 1, status: 'waiting' }, { id: 'b', sessionId: 'abc', pid: 2, status: 'waiting' }];
+  assert.deepStrictEqual(A.notifyTargets(prev, next).map((x) => x.id), ['a']);
+});
+
+test('collapseRepeats: gemelos de mismo sessionId → una fila ×2', () => {
+  const r = A.collapseRepeats([cs('a', 'idle', { sessionId: 'abc', pid: 1, title: 'Fix login' }),
+    cs('b', 'idle', { sessionId: 'abc', pid: 2, title: 'Fix login' })], 'idle');
+  assert.strictEqual(r.length, 1);
+  assert.strictEqual(r[0].copies.length, 2);
+});
+
+test('collapseRepeats: mismo cwd + título → ×2; mismo título en otro cwd → 2 filas', () => {
+  const same = A.collapseRepeats([cs('a', 'idle', { title: 'Refactor' }), cs('b', 'idle', { title: 'Refactor' })], 'idle');
+  assert.strictEqual(same.length, 1);
+  const diff = A.collapseRepeats([cs('a', 'idle', { title: 'Refactor' }),
+    cs('b', 'idle', { title: 'Refactor', cwd: '/home/user/web-app' })], 'idle');
+  assert.strictEqual(diff.length, 2);
+});
+
+test('collapseRepeats: título vacío o ausente nunca colapsa', () => {
+  const r = A.collapseRepeats([cs('a', 'done'), cs('b', 'done'), cs('c', 'done', { title: '  ' })], 'done');
+  assert.strictEqual(r.length, 3);
+});
+
+test('collapseRepeats: busy y waiting nunca colapsan', () => {
+  const l = [cs('a', 'busy', { title: 'Same' }), cs('b', 'busy', { title: 'Same' })];
+  assert.strictEqual(A.collapseRepeats(l, 'busy').length, 2);
+  assert.strictEqual(A.collapseRepeats(l, 'waiting').length, 2);
+});
+
+test('collapseRepeats: tres done iguales → ×3 con la más reciente como head', () => {
+  const r = A.collapseRepeats([cs('a', 'done', { title: 'T', lastActivityAt: 100 }),
+    cs('b', 'done', { title: 'T', lastActivityAt: 300 }), cs('c', 'done', { title: 'T', lastActivityAt: 200 })], 'done');
+  assert.strictEqual(r.length, 1);
+  assert.strictEqual(r[0].head.id, 'b');
+  assert.deepStrictEqual(r[0].copies.map((x) => x.id), ['a', 'b', 'c']);
+});
+
+test('collapseRepeats: mayúsculas, tildes y markdown no impiden el colapso; conserva el orden', () => {
+  const r = A.collapseRepeats([cs('x', 'idle', { title: 'Otra cosa' }),
+    cs('a', 'idle', { title: 'Revisión **Rápida**' }), cs('b', 'idle', { title: 'revision rapida' })], 'idle');
+  assert.deepStrictEqual(r.map((e) => e.head.id), ['x', 'a']);
+  assert.strictEqual(r[1].copies.length, 2);
+});
+
+test('collapseRepeats: tolera null y sesiones sin cwd', () => {
+  assert.deepStrictEqual(A.collapseRepeats(null, 'idle'), []);
+  const r = A.collapseRepeats([{ id: 'a', status: 'idle', title: 'T' }, { id: 'b', status: 'idle', title: 'T' }], 'idle');
+  assert.strictEqual(r.length, 2);
+});
+
+test('collapseMixed: colapsa por estado sin mezclar idle con done', () => {
+  const r = A.collapseMixed([cs('a', 'idle', { title: 'T' }), cs('b', 'done', { title: 'T' }),
+    cs('c', 'idle', { title: 'T' }), cs('d', 'busy', { title: 'T' })], GNOW);
+  assert.deepStrictEqual(r.map((e) => e.copies.length), [2, 1, 1]);
+});
+
+test('rowView: el chip ×N va primero y cuenta para el tope', () => {
+  const v = A.rowView(cs('a', 'idle', { title: 'T', errors: { count: 2, last: 'x' }, stale: true }),
+    { now: GNOW, maxChips: 2, copies: 3 });
+  assert.strictEqual(v.chips[0].text, '×3');
+  assert.strictEqual(v.chips.length, 2);
+  assert.match(v.chips[0].title, /3 sesiones con el mismo título/);
+  assert.strictEqual(A.rowView(cs('a', 'idle'), { now: GNOW, copies: 1 }).chips.every((c) => c.cls !== 'rep'), true);
+});
