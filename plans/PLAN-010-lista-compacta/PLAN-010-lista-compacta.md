@@ -86,7 +86,7 @@ para medir 25+ filas → TASK-022 crea un fixture de lista con el escenario real
 | Task | Qué | Especialista | Modelo | Depende de | Estado |
 |------|-----|--------------|--------|------------|--------|
 | **TASK-022** | Fixture de lista (`?fixture=lista`, 43 sesiones sintéticas) + timeline de 20 eventos + medición de partida | claude-dashboard-worker | sonnet | — | `done` |
-| **TASK-023** | Backend: log de diagnóstico cuando una sesión espera sin `ask` (motivo: sin transcript / sin texto en el turno) | claude-dashboard-worker | sonnet | — | `pending` |
+| **TASK-023** | Backend: log de diagnóstico cuando una sesión espera sin `ask` (motivo: sin transcript / sin texto en el turno) | claude-dashboard-worker | sonnet | — | `done` |
 | **TASK-024** | Fila de una línea, lista 60 %, encabezado en 2 renglones, timeline alta | claude-dashboard-worker | sonnet | TASK-022 | `pending` |
 | **TASK-025** | Grupos por estado con contador; terminadas/abandonadas en el encabezado; la que espera sale de la lista y la bandeja entra en j/k | claude-dashboard-worker | sonnet | TASK-024 | `pending` |
 | **TASK-026** | Colapso "×N" de repetidos + clave de fila única + sección "Copias" en el detalle | claude-dashboard-worker | sonnet | TASK-025 | `pending` |
