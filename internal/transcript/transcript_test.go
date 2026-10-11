@@ -316,3 +316,19 @@ func TestSummaryAwayBeforeLastPromptIsNil(t *testing.T) {
 		t.Error("turnStartedAt debería estar")
 	}
 }
+
+// Found distingue "no hay transcript" de "hay transcript sin nada abierto" y,
+// al estar en el cache, no se pierde en la segunda lectura (PLAN-010 TASK-023).
+func TestSummaryFound(t *testing.T) {
+	setup(t, "testdata")
+	for i := 0; i < 2; i++ { // 2ª vuelta: sale del cache
+		d, err := Summary("/work/demo", "sess-basic")
+		if err != nil || !d.Found {
+			t.Fatalf("vuelta %d: found=%v err=%v", i, d.Found, err)
+		}
+	}
+	d, err := Summary("/work/demo", "sess-no-existe")
+	if err != nil || d.Found {
+		t.Fatalf("inexistente: found=%v err=%v", d.Found, err)
+	}
+}

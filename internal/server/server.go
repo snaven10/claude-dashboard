@@ -59,6 +59,10 @@ type Server struct {
 	current  []byte
 	sessions []agents.Session
 	subs     map[chan []byte]struct{}
+
+	// waitMu protege waitLog: sessionId → último motivo logueado de "espera sin ask".
+	waitMu  sync.Mutex
+	waitLog map[string]string
 }
 
 func (s *Server) logf(format string, args ...any) {

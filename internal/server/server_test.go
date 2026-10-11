@@ -853,3 +853,103 @@ func TestSessionsCarryDatosDeSesion(t *testing.T) {
 		t.Error("cambió el número de activos y no emitió")
 	}
 }
+
+// waitingServer arma un server con UNA sesión y captura las líneas "waiting sin ask".
+func waitingServer(sess *agents.Session, detail *transcript.Detail) (*Server, *[]string) {
+	var mu sync.Mutex
+	var lines []string
+	s := newTestServer(func(context.Context) ([]agents.Session, error) {
+		return []agents.Session{*sess}, nil
+	})
+	s.Summary = func(string, string) (transcript.Detail, error) { return *detail, nil }
+	s.Logf = func(f string, a ...any) {
+		l := fmt.Sprintf(f, a...)
+		if strings.HasPrefix(l, "waiting sin ask") {
+			mu.Lock()
+			lines = append(lines, l)
+			mu.Unlock()
+		}
+	}
+	return s, &lines
+}
+
+func TestWaitingWithoutAskLog(t *testing.T) {
+	wf := "permission prompt"
+	sess := &agents.Session{ID: "a", SessionID: "0123456789abcdef", Cwd: "/work/demo", Project: "demo",
+		Status: agents.StatusWaiting, WaitingFor: &wf}
+	// (a) transcript encontrado, sin ask → sin-texto-en-turno; contenido privado en el detalle.
+	detail := &transcript.Detail{Found: true, Title: "SECRETO titulo", LastPrompt: "SECRETO prompt",
+		LastAction: &transcript.Action{Kind: "tool", Text: "SECRETO /home/x"}}
+	s, lines := waitingServer(sess, detail)
+	ctx := context.Background()
+	if _, err := s.Refresh(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(*lines) != 1 || (*lines)[0] != "waiting sin ask: 01234567 waitingFor=permission prompt motivo=sin-texto-en-turno" {
+		t.Fatalf("(a) log = %q", *lines)
+	}
+	if strings.Contains((*lines)[0], "SECRETO") {
+		t.Error("el log filtra texto de la sesión")
+	}
+	// (c) dos Refresh iguales → un solo log (el segundo ni siquiera cambia el hash).
+	if _, err := s.Refresh(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(*lines) != 1 {
+		t.Fatalf("(c) se repitió el log: %q", *lines)
+	}
+	// El motivo cambia → vuelve a loguear una vez.
+	*detail = transcript.Detail{}
+	if _, err := s.Refresh(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(*lines) != 2 || !strings.HasSuffix((*lines)[1], "motivo=sin-transcript") {
+		t.Fatalf("(b) log = %q", *lines)
+	}
+	// Deja de esperar y vuelve a esperar → se olvidó: loguea de nuevo.
+	sess.Status = agents.StatusBusy
+	s.Refresh(ctx)
+	sess.Status = agents.StatusWaiting
+	s.Refresh(ctx)
+	if len(*lines) != 3 {
+		t.Fatalf("tras olvidar: %q", *lines)
+	}
+}
+
+func TestWaitingWithoutAskLogSkips(t *testing.T) {
+	// (d) idle sin ask → nada.
+	idle := &agents.Session{ID: "i", SessionID: "idle-session-1", Status: agents.StatusIdle}
+	s, lines := waitingServer(idle, &transcript.Detail{Found: true})
+	if _, err := s.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	// waiting CON ask → nada.
+	w := &agents.Session{ID: "w", SessionID: "wait-session-1", Status: agents.StatusWaiting}
+	s2, lines2 := waitingServer(w, &transcript.Detail{Found: true, Ask: &transcript.Ask{Kind: "text", Text: "¿sigo?"}})
+	if _, err := s2.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(*lines) != 0 || len(*lines2) != 0 {
+		t.Fatalf("no debía loguear: %q %q", *lines, *lines2)
+	}
+}
+
+// (e) Found no entra en el JSON de la sesión.
+func TestFoundNotInContract(t *testing.T) {
+	sess := &agents.Session{ID: "a", SessionID: "sess-found", Status: agents.StatusWaiting}
+	s, _ := waitingServer(sess, &transcript.Detail{Found: true, Title: "t"})
+	if _, err := s.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	var snap struct {
+		Sessions []map[string]any `json:"sessions"`
+	}
+	if err := json.Unmarshal(s.snapshot(), &snap); err != nil || len(snap.Sessions) != 1 {
+		t.Fatalf("snapshot: %v", err)
+	}
+	for k := range snap.Sessions[0] {
+		if strings.EqualFold(k, "found") {
+			t.Errorf("campo nuevo en el contrato: %q", k)
+		}
+	}
+}

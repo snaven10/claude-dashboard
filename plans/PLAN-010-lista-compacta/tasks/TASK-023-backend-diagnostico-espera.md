@@ -4,7 +4,7 @@
 - **Especialista:** claude-dashboard-worker (sonnet)
 - **Proyecto:** claude-dashboard (raíz del repo), rama `feature/plan-10-task-023` desde `main`
 - **Depende de:** — (en paralelo con TASK-022 y con cualquier task del frontend)
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -54,10 +54,25 @@ para confirmar en vivo cuál de las dos ramas del master §2.1 produce el "input
   el caso "sin archivo" no pasa por el cache; verificar que no se cachee un `Found` viejo.
 
 ## Resultado
-<!-- SE LLENA AL CERRAR (estado done/skipped). Vacío mientras esté pending. -->
-- **Estado final:**
-- **Resumen:**
-- **Archivos tocados:**
-- **Verificado por:**
-- **Desviaciones:**
-- **Riesgos abiertos / siguiente:**
+- **Estado final:** done
+- **Resumen:** `transcript.Detail` gana `Found bool` (`json:"-"`): `Summary` lo pone en `true` solo cuando
+  encontró y leyó el archivo (el caso "sin archivo" devuelve `Detail{}` y no pasa por el cache, así que
+  no hay `Found` viejo cacheado). El poller guarda el estado por sesión (sin resumen / encontrado / sin
+  transcript) y, tras `enrich`, `logWaitingWithoutAsk` loguea
+  `waiting sin ask: <8 del sessionId> waitingFor=<valor F1|-> motivo=sin-transcript|sin-texto-en-turno`
+  solo cuando el motivo de esa sesión cambia; el mapa `sessionId → motivo` (con `waitMu`) se reconstruye
+  en cada ciclo, así que olvida las sesiones que dejan de esperar o desaparecen. Un error de `Summary`
+  no loguea motivo (ya hay log `transcript ...`). Sin cambios en el contrato ni en `docs/API.md`.
+- **Archivos tocados:** `internal/server/poller.go`, `internal/server/server.go` (campos `waitMu`/`waitLog`),
+  `internal/server/server_test.go`, `internal/transcript/transcript.go`,
+  `internal/transcript/transcript_test.go`. Commit código: `7b63043`.
+- **Verificado por:** en el worktree, `gofmt -l .` → vacío; `go vet ./...` → sin salida;
+  `go test -race ./...` → ok en agents, history, orq, plans, server, transcript (cmd y web sin tests).
+  Tests nuevos: `TestWaitingWithoutAskLog` (a, b, c + olvido y re-log), `TestWaitingWithoutAskLogSkips`
+  (d + waiting con ask), `TestFoundNotInContract` (e), `TestSummaryFound`. El test (a) verifica que la
+  línea es exactamente la esperada y no contiene el título/prompt/acción de la sesión.
+- **Desviaciones:** el test (e) comprueba que no aparece un campo `found` en el JSON de la sesión; las
+  claves del contrato ya las cubre `TestSessionsContract` (`server_test.go:126`), que sigue en verde.
+- **Riesgos abiertos / siguiente:** el log solo confirma §2.1 con una sesión interactiva esperando en
+  vivo; no se levantó el server contra sesiones reales (fuera de alcance del worker). TASK-027 ya puede
+  construirse sobre ambas ramas. Nada pusheado.
