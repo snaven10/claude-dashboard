@@ -5,7 +5,7 @@
 - **Proyecto:** claude-dashboard (raíz del repo), rama `feature/plan-10-task-027` desde `main` (con TASK-026 mergeada)
 - **Depende de:** TASK-026 (mismo archivo; lógicamente solo necesita TASK-025). TASK-023 no bloquea
   la implementación, pero su log es lo que confirma §2.1 del master al cerrar el plan.
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -65,9 +65,9 @@ Claude o tu último pedido). Implementa DD-41 del master.
 
 ## Resultado
 <!-- SE LLENA AL CERRAR (estado done/skipped). Vacío mientras esté pending. -->
-- **Estado final:**
-- **Resumen:**
-- **Archivos tocados:**
-- **Verificado por:**
-- **Desviaciones:**
-- **Riesgos abiertos / siguiente:**
+- **Estado final:** done
+- **Resumen:** `waitView(s)`/`waitingLabel`/`waitFull` (DD-41) en `web/app.js`. Bandeja: etiqueta en negrita + texto o "· contexto" en una línea, `title` con el texto completo. Detalle: la línea suelta `.waiting-for` ahora usa `waitView` y solo aparece sin `ask` (no duplica el bloque ask). Aviso de Windows: proyecto + `waitFull(waitView(s))`. Fixture sin cambios.
+- **Archivos tocados:** `web/app.js`, `web/app.test.js` (commit 72bd5c3). `web/app.css` sin tocar.
+- **Verificado por:** `node --check web/app.js` ok; `node --test web/` 82/82 pass; `rg innerHTML web/app.js` vacío; `gofmt -l .` vacío; `go vet ./...` ok; `go test -race ./...` ok.
+- **Desviaciones:** el prefijo del contexto es siempre "▸" (literal del DD-41), también si `lastAction.kind` no es `tool`. En el detalle, `waitView` se muestra si no hay `ask` y (`waitingFor` o estado waiting/blocked).
+- **Riesgos abiertos / siguiente:** NO verificado en navegador: `document.body.innerText.includes('input needed') === false` con `?fixture=lista` y `?fixture`, y la medición de alto de bandeja (motivo en una línea por CSS existente `.ask-q`). Correrlos en TASK-029 o con la medición estándar.

@@ -799,3 +799,39 @@ test('rowView: el chip ×N va primero y cuenta para el tope', () => {
   assert.match(v.chips[0].title, /3 sesiones con el mismo título/);
   assert.strictEqual(A.rowView(cs('a', 'idle'), { now: GNOW, copies: 1 }).chips.every((c) => c.cls !== 'rep'), true);
 });
+
+test('waitView: motivo traducido y contexto, nunca "input needed" (DD-41)', () => {
+  const A = require('./app.js');
+  const act = { kind: 'tool', text: 'Bash: npm test' };
+  const v = A.waitView({ status: 'waiting', waitingFor: 'input needed', lastAction: act, lastPrompt: 'hacé X' });
+  assert.strictEqual(v.label, 'espera tu respuesta');
+  assert.strictEqual(v.context, 'lo último: ▸ Bash: npm test');
+  assert.strictEqual(A.waitFull(v), 'espera tu respuesta · lo último: ▸ Bash: npm test');
+  assert.strictEqual(A.waitView({ waitingFor: 'permission prompt' }).label, 'pide permiso en la terminal');
+  assert.strictEqual(A.waitView({ waitingFor: 'dialog open' }).label, 'tiene un diálogo abierto en la terminal');
+  assert.strictEqual(A.waitView({ waitingFor: 'permission to run: rm -rf build/' }).label, 'permission to run: rm -rf build/');
+  assert.strictEqual(A.waitView(null).label, 'necesita tu atención');
+  assert.strictEqual(A.waitView({ waitingFor: '' }).context, '');
+});
+
+test('waitView: contexto cae a lastPrompt recortado; ask gana siempre', () => {
+  const A = require('./app.js');
+  const long = 'x'.repeat(300);
+  const c = A.waitView({ waitingFor: 'permission prompt', lastPrompt: long }).context;
+  assert.ok(c.startsWith('tu último pedido: '));
+  assert.ok(c.length <= 'tu último pedido: '.length + 120);
+  const v = A.waitView({ waitingFor: 'input needed', lastAction: { kind: 'tool', text: 'a' },
+    ask: { kind: 'tool', text: 'Bash: git push', more: 2 } });
+  assert.deepStrictEqual([v.label, v.text, v.context, v.more], ['pide permiso:', 'Bash: git push', '', '+2 preguntas']);
+  assert.strictEqual(A.waitView({ ask: { kind: 'question', text: 'q' } }).label, 'pregunta:');
+});
+
+test('waitView: texto hostil queda como texto y no aparece "input needed"', () => {
+  const A = require('./app.js');
+  const evil = '<img src=x onerror=alert(1)>';
+  const v = A.waitView({ waitingFor: 'input needed', lastAction: { kind: 'tool', text: evil } });
+  assert.ok(v.context.includes(evil));
+  const all = [null, {}, { waitingFor: 'input needed' }, { waitingFor: 'Input Needed', lastPrompt: 'p' },
+    { waitingFor: 'input needed', lastAction: { kind: 'text', text: 'hola' } }];
+  all.forEach((s) => assert.ok(!A.waitFull(A.waitView(s)).includes('input needed')));
+});
