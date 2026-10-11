@@ -22,6 +22,7 @@ import (
 	"claude-dashboard/internal/history"
 	"claude-dashboard/internal/orq"
 	"claude-dashboard/internal/transcript"
+	"claude-dashboard/web"
 )
 
 func fakeSessions(n int) []agents.Session {
@@ -1146,4 +1147,52 @@ func TestStaticPWAHeaders(t *testing.T) {
 	}
 	check("/manifest.webmanifest", "Content-Type", "application/manifest+json")
 	check("/sw.js", "Cache-Control", "no-cache")
+}
+
+// El FS real embebido: manifest como JSON válido de PWA y sw.js sin caché.
+func TestStaticPWAEmbebidoReal(t *testing.T) {
+	s := newTestServer(func(context.Context) ([]agents.Session, error) { return nil, nil })
+	s.Static = web.FS
+	ts := httptest.NewServer(s.Handler())
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/manifest.webmanifest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("manifest: status %d", resp.StatusCode)
+	}
+	var m struct {
+		Display string `json:"display"`
+		Icons   []struct {
+			Src string `json:"src"`
+		} `json:"icons"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
+		t.Fatalf("manifest no es JSON: %v", err)
+	}
+	if m.Display != "standalone" || len(m.Icons) != 3 {
+		t.Fatalf("manifest inesperado: %+v", m)
+	}
+	for _, ic := range m.Icons {
+		r, err := http.Get(ts.URL + "/" + ic.Src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Body.Close()
+		if r.StatusCode != 200 {
+			t.Errorf("%s: status %d", ic.Src, r.StatusCode)
+		}
+	}
+
+	sw, err := http.Get(ts.URL + "/sw.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sw.Body.Close()
+	if sw.StatusCode != 200 || sw.Header.Get("Cache-Control") != "no-cache" {
+		t.Errorf("sw.js: status %d, Cache-Control %q", sw.StatusCode, sw.Header.Get("Cache-Control"))
+	}
 }
