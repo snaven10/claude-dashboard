@@ -91,11 +91,18 @@ type job struct {
 // Sender manda avisos. Send es síncrono; Enqueue + Start dan la cola acotada
 // con un worker. Seguro para uso concurrente.
 type Sender struct {
-	Client *http.Client // nil = http.Client{Timeout: 10s}
+	Client *http.Client // nil = cliente con guard SSRF, sin redirects ni proxy, 10s
 	Keys   *Keys
 	Now    func() time.Time // nil = time.Now
+	// allowPrivate desactiva el guard de IPs no públicas del cliente por
+	// defecto. No exportado: solo los tests del paquete lo setean.
+	allowPrivate bool
+
 	// OnGone se llama con el endpoint cuando el servicio responde 404/410.
 	OnGone func(endpoint string)
+
+	defOnce   sync.Once
+	defClient *http.Client
 
 	once  sync.Once
 	queue chan job
@@ -113,10 +120,14 @@ func (s *Sender) now() time.Time {
 }
 
 func (s *Sender) client() *http.Client {
+	// Siempre sin seguir redirecciones (SSRF), también con Client inyectado.
 	if s.Client != nil {
-		return s.Client
+		c := *s.Client
+		c.CheckRedirect = noRedirect
+		return &c
 	}
-	return &http.Client{Timeout: clientTimeout}
+	s.defOnce.Do(func() { s.defClient = newGuardedClient(s.allowPrivate) })
+	return s.defClient
 }
 
 func (s *Sender) init() {
@@ -188,6 +199,8 @@ func (s *Sender) Send(ctx context.Context, sub Subscription, payload []byte, top
 
 	st := resp.StatusCode
 	switch {
+	case st >= 300 && st < 400:
+		return Result{Outcome: Err, Status: st, Err: fmt.Errorf("webpush: redirección %d no seguida", st)}
 	case st == http.StatusCreated || st == http.StatusAccepted:
 		return Result{Outcome: OK, Status: st}
 	case st == http.StatusNotFound || st == http.StatusGone:

@@ -5,10 +5,12 @@ import (
 	"context"
 	"crypto/ecdh"
 	"crypto/tls"
+	"errors"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -336,4 +338,51 @@ func waitFor(t *testing.T, cond func() bool) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("condición no alcanzada a tiempo")
+}
+
+func TestSendDoesNotFollowRedirect(t *testing.T) {
+	var target atomic.Int32
+	tgt := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { target.Add(1) }))
+	defer tgt.Close()
+	rg := newRig(t, func(w http.ResponseWriter, r *http.Request, _ []byte) {
+		http.Redirect(w, r, tgt.URL+"/x", http.StatusTemporaryRedirect)
+	})
+	res := rg.sender.Send(context.Background(), rg.sub, []byte("hola"), "")
+	if res.Outcome != Err || res.Status != http.StatusTemporaryRedirect {
+		t.Fatalf("res = %+v, quiero Err con 307", res)
+	}
+	if target.Load() != 0 {
+		t.Fatal("se siguió la redirección")
+	}
+}
+
+func TestIsPublicAddr(t *testing.T) {
+	cases := map[string]bool{
+		"127.0.0.1": false, "::1": false, "10.1.2.3": false, "172.16.0.1": false,
+		"192.168.1.1": false, "169.254.1.1": false, "100.64.0.1": false,
+		"100.127.255.254": false, "fd00::1": false, "::ffff:127.0.0.1": false,
+		"0.0.0.0": false, "224.0.0.1": false, "fe80::1": false, "ff02::1": false,
+		"8.8.8.8": true, "142.250.0.1": true, "2001:4860::1": true, "100.128.0.1": true,
+	}
+	for in, want := range cases {
+		if got := isPublicAddr(netip.MustParseAddr(in)); got != want {
+			t.Errorf("isPublicAddr(%s) = %v, quiero %v", in, got, want)
+		}
+	}
+}
+
+func TestDefaultSenderBlocksLoopback(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { hits.Add(1) }))
+	defer srv.Close()
+	_, p256dh, auth := newSubscription(t)
+	s := &Sender{Keys: newKeysT(t)}
+	sub := Subscription{Endpoint: srv.URL + "/push", P256dh: b64url.EncodeToString(p256dh), Auth: b64url.EncodeToString(auth)}
+	res := s.Send(context.Background(), sub, []byte("hola"), "")
+	if res.Outcome != Err || !errors.Is(res.Err, errBlockedAddr) {
+		t.Fatalf("res = %+v, quiero Err por destino bloqueado", res)
+	}
+	if hits.Load() != 0 {
+		t.Fatal("el servidor loopback recibió la conexión")
+	}
 }
