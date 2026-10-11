@@ -440,11 +440,89 @@
     return out;
   }
 
+  // ---- PLAN-010: fila de una línea (DD-37) ----
+
+  var ROW_STATUS_TEXT = { waiting: 'esperándote', blocked: 'esperándote', busy: 'trabajando', idle: 'idle', done: 'done' };
+
+  // "hace 5 min" relativo a `now`; sin fecha, "—".
+  function agoFrom(ms, now) {
+    if (!ms) return '—';
+    var s = Math.max(0, Math.floor((now - ms) / 1000));
+    if (s < 60) return 'hace ' + s + ' s';
+    var m = Math.floor(s / 60);
+    if (m < 60) return 'hace ' + m + ' min';
+    var h = Math.floor(m / 60);
+    if (h < 24) return 'hace ' + h + ' h';
+    return 'hace ' + Math.floor(h / 24) + ' d';
+  }
+
+  // Prioridad (menor = primero): errores > contexto warn > ritmo high > stale > turno largo > PR >
+  // subagentes > líneas > permisos. Cada candidato: { cls, text, title, lines?, pri }.
+  var CHIP_PRI_BY_CLS = { warn: 4, pr: 5, sub: 6, 'lines num': 7, '': 8 };
+
+  function rowChipCandidates(s, now) {
+    var out = [];
+    var ev = errorsView(s.errors);
+    if (ev && ev.badge) out.push({ cls: 'err', text: ev.badge, title: ev.title, pri: 0 });
+    if (s.context && s.context.warn) {
+      out.push({ cls: 'warn', text: '⚠ contexto ' + formatTokens(s.context.current), title: contextTitle(s.context), pri: 1 });
+    }
+    if (s.rate && s.rate.high) out.push({ cls: 'warn', text: '⚡ ritmo inusual', title: rateTitle(s.rate), pri: 2 });
+    if (s.stale) {
+      var when = agoFrom(s.lastActivityAt, now);
+      out.push({ cls: 'warn', text: '⚠ sin actividad ' + when, title: 'Sin actividad ' + when, pri: 3 });
+    }
+    sessionChips(s, now).forEach(function (c) {
+      var p = Object.prototype.hasOwnProperty.call(CHIP_PRI_BY_CLS, c.cls) ? CHIP_PRI_BY_CLS[c.cls] : 9;
+      var o = { cls: c.cls, text: c.text, title: c.title, pri: p };
+      if (c.lines) o.lines = c.lines;
+      out.push(o);
+    });
+    // orden estable por prioridad
+    return out.map(function (c, i) { return { c: c, i: i }; })
+      .sort(function (a, b) { return a.c.pri - b.c.pri || a.i - b.i; })
+      .map(function (x) { return x.c; });
+  }
+
+  // Todo lo que la fila de una línea necesita. opts: { now, projectFilter, maxChips (default 2) }.
+  // Texto de sesiones siempre pasa por plainText; quien pinta usa textContent.
+  function rowView(s, opts) {
+    opts = opts || {};
+    var now = typeof opts.now === 'number' ? opts.now : Date.now();
+    var max = typeof opts.maxChips === 'number' && opts.maxChips >= 0 ? Math.floor(opts.maxChips) : 2;
+    var st = Object.prototype.hasOwnProperty.call(ROW_STATUS_TEXT, s.status) ? s.status : 'idle';
+    var title = plainText(s.title || s.name || s.id);
+    var projText = plainText(s.project);
+    var project = opts.projectFilter ? null : (projText || null);
+
+    var all = rowChipCandidates(s, now);
+    var chips = all.slice(0, max);
+    var rest = all.slice(max);
+
+    var av = st === 'idle' ? askView(s) : null;
+    var tooltip = awayLine(s) || (av ? plainText(av.text) : '');
+    if (!tooltip) tooltip = [projText, s.branch ? '⎇ ' + plainText(s.branch) : null].filter(Boolean).join(' · ');
+
+    var when = agoFrom(s.lastActivityAt || s.startedAt, now);
+    return {
+      status: st,
+      title: title,
+      project: project,
+      chips: chips,
+      extra: rest.length,
+      extraTitle: rest.map(function (c) { return c.text; }).join(' · '),
+      when: when,
+      tooltip: tooltip,
+      ariaLabel: title + ', ' + ROW_STATUS_TEXT[st] + ', ' + when
+    };
+  }
+
   if (typeof document === 'undefined') {
     if (typeof module !== 'undefined' && module.exports) {
       module.exports = {
         validPrUrl: validPrUrl, validArtifactUrl: validArtifactUrl, validPrs: validPrs, validArtifacts: validArtifacts,
         turnMinutes: turnMinutes, awayLine: awayLine, sessionChips: sessionChips,
+        rowView: rowView, agoFrom: agoFrom,
         isAbandoned: isAbandoned, counts: counts, inboxItems: inboxItems, splitAbandoned: splitAbandoned,
         stepSelection: stepSelection, plainText: plainText, oneLine: oneLine, todayView: todayView,
         notifyTargets: notifyTargets, formatTokens: formatTokens, totalTokens: totalTokens,
@@ -531,14 +609,7 @@
   }
 
   function ago(ms) {
-    if (!ms) return '—';
-    var s = Math.max(0, Math.floor((nowMs() - ms) / 1000));
-    if (s < 60) return 'hace ' + s + ' s';
-    var m = Math.floor(s / 60);
-    if (m < 60) return 'hace ' + m + ' min';
-    var h = Math.floor(m / 60);
-    if (h < 24) return 'hace ' + h + ' h';
-    return 'hace ' + Math.floor(h / 24) + ' d';
+    return agoFrom(ms, nowMs());
   }
 
   function shQuote(s) {
@@ -912,31 +983,31 @@
     dot.setAttribute('aria-hidden', 'true');
     r.appendChild(dot);
 
-    var main = el('span', 'row-main');
-    main.appendChild(el('span', 'row-title', titleOf(s)));
-    var av = st === 'idle' ? askView(s) : null;
-    var away = awayLine(s);
-    var sub = away || (av ? plainText(av.text) : [s.project, s.branch ? '⎇ ' + s.branch : null].filter(Boolean).join(' · '));
-    var subEl = el('span', 'row-sub', sub);
-    if (away) subEl.title = 'Mientras no estabas';
-    main.appendChild(subEl);
-    var chips = chipsFor(s, false);
-    if (chips) main.appendChild(chips);
-    r.appendChild(main);
-
-    var side = el('span', 'row-side');
-    side.appendChild(el('span', 'row-st st-' + st, STATUS_LABEL[st]));
-    side.appendChild(el('span', 'num', ago(s.lastActivityAt || s.startedAt)));
-    if (s.context && typeof s.context.current === 'number') {
-      var bar = el('span', 'bar ctx');
-      bar.title = formatContext(s.context);
-      var fill = el('i');
-      fill.style.width = Math.max(0, Math.min(100, s.context.current / 10000)) + '%';
-      if (s.context.warn) fill.className = 'warn';
-      bar.appendChild(fill);
-      side.appendChild(bar);
+    // Un renglón (DD-37): punto · título · proyecto · chips · hora. El estado va en aria-label.
+    var v = rowView(s, { now: nowMs(), projectFilter: filters.project, maxChips: isPhone() ? 1 : 2 });
+    r.title = v.tooltip;
+    r.setAttribute('aria-label', v.ariaLabel);
+    r.appendChild(el('span', 'row-title', v.title));
+    if (v.project) r.appendChild(el('span', 'row-proj', v.project));
+    if (v.chips.length || v.extra) {
+      var w = el('span', 'chips');
+      v.chips.forEach(function (c) {
+        var n;
+        if (c.lines) {
+          n = el('span', 'chip ' + c.cls);
+          n.appendChild(el('span', 'add', '+' + c.lines.added));
+          n.appendChild(document.createTextNode(' '));
+          n.appendChild(el('span', 'del', '−' + c.lines.removed));
+          n.title = c.title;
+        } else {
+          n = chip(c.cls, c.text, c.title);
+        }
+        w.appendChild(n);
+      });
+      if (v.extra) w.appendChild(chip('more', '+' + v.extra, v.extraTitle));
+      r.appendChild(w);
     }
-    r.appendChild(side);
+    r.appendChild(el('span', 'row-when num', v.when));
     r.addEventListener('click', function () { select(key, true); });
     return r;
   }
@@ -1026,21 +1097,24 @@
     box.replaceChildren.apply(box, items.map(function (s) {
       var key = sessionKey(s);
       var c = el('article', 'ask-card');
+      // Renglón 1: título · proyecto · hora + acciones a la derecha. Renglón 2: motivo en una línea.
       var h = el('header');
       h.appendChild(el('strong', null, titleOf(s)));
+      h.appendChild(el('span', 'meta', [s.project, s.branch ? '⎇ ' + s.branch : null].filter(Boolean).join(' · ')));
       h.appendChild(el('span', 'help', ago(s.lastActivityAt || s.startedAt)));
-      c.appendChild(h);
-      c.appendChild(el('div', 'meta', [s.project, s.branch ? '⎇ ' + s.branch : null].filter(Boolean).join(' · ')));
       var av = askView(s);
       var q = el('div', 'ask-q');
+      var full;
       if (av) {
         q.appendChild(el('span', 'lbl', av.label));
         q.appendChild(document.createTextNode(plainText(av.text)));
-        if (av.more) q.appendChild(el('div', 'lbl', av.more));
+        if (av.more) q.appendChild(el('span', 'lbl', ' ' + av.more));
+        full = av.label + ' ' + plainText(av.text) + (av.more ? ' ' + av.more : '');
       } else {
-        q.appendChild(document.createTextNode(s.waitingFor || 'necesita tu atención'));
+        full = s.waitingFor || 'necesita tu atención';
+        q.appendChild(document.createTextNode(full));
       }
-      c.appendChild(q);
+      q.title = full;
       var a = el('div', 'ask-actions');
       var open = btn('ver detalle');
       open.addEventListener('click', function () { select(key, true); });
@@ -1052,7 +1126,9 @@
         ph.addEventListener('click', function () { qrOpenFor = key; select(key, true); });
         a.appendChild(ph);
       }
-      c.appendChild(a);
+      h.appendChild(a);
+      c.appendChild(h);
+      c.appendChild(q);
       return c;
     }));
   }

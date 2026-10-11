@@ -546,3 +546,116 @@ test('fixture: los 7 campos están en varias sesiones y lo hostil es inerte', ()
   const busyAway = fx.sessions.find((x) => x.status === 'busy' && x.away);
   assert.strictEqual(bandeja.awayLine(busyAway), '');
 });
+
+// ---- PLAN-010 / TASK-024: rowView (fila de una línea) ----
+
+const RNOW = 1_800_000_000_000;
+const RMIN = 60000;
+const RVIEW = require('./app.js');
+
+// sesión con TODAS las señales posibles, para probar orden y tope
+const cargada = () => s('c', 'busy', {
+  title: 'Refactor del cliente',
+  project: 'api-backend',
+  branch: 'feature/x',
+  lastActivityAt: RNOW - 5 * RMIN,
+  errors: { count: 4, high: true, windowMin: 10 },
+  context: { current: 900000, warn: true },
+  rate: { high: true },
+  stale: true,
+  turnStartedAt: RNOW - 20 * RMIN,
+  prs: [{ number: 12, url: 'https://git.test/pr/12', repo: 'org/api-backend' }],
+  subagents: { active: 2, total: 3 },
+  lines: { added: 10, removed: 2 },
+  permissionMode: 'acceptEdits'
+});
+
+test('rowView: prioridad de chips y tope de 2 con "+N" y extraTitle', () => {
+  const v = RVIEW.rowView(cargada(), { now: RNOW, projectFilter: '' });
+  assert.strictEqual(v.chips.length, 2);
+  assert.ok(/errores/.test(v.chips[0].text));
+  assert.ok(/contexto/.test(v.chips[1].text));
+  // quedan: ritmo, stale, turno, PR, subagentes, líneas, permisos = 7
+  assert.strictEqual(v.extra, 7);
+  assert.ok(v.extraTitle.indexOf('ritmo') !== -1 && v.extraTitle.indexOf('PR #12') !== -1);
+  assert.ok(v.extraTitle.indexOf('errores') === -1);
+});
+
+test('rowView: orden completo errores > contexto > ritmo > stale > turno > PR > subagentes > líneas > permisos', () => {
+  const v = RVIEW.rowView(cargada(), { now: RNOW, projectFilter: '', maxChips: 99 });
+  const kinds = v.chips.map((c) => {
+    if (/errores/.test(c.text)) return 'err';
+    if (/contexto/.test(c.text)) return 'ctx';
+    if (/ritmo/.test(c.text)) return 'rate';
+    if (/sin actividad/.test(c.text)) return 'stale';
+    if (/^turno/.test(c.text)) return 'turn';
+    if (/^PR/.test(c.text)) return 'pr';
+    if (/subagente/.test(c.text)) return 'sub';
+    if (c.lines) return 'lines';
+    return 'perm';
+  });
+  assert.deepStrictEqual(kinds, ['err', 'ctx', 'rate', 'stale', 'turn', 'pr', 'sub', 'lines', 'perm']);
+  assert.strictEqual(v.extra, 0);
+});
+
+test('rowView: turno corto no es chip; maxChips 1 (teléfono) manda el resto a "+N"', () => {
+  const corto = s('t', 'busy', { title: 't', turnStartedAt: RNOW - 3 * RMIN, subagents: { active: 1, total: 1 }, lines: { added: 1, removed: 0 } });
+  const v = RVIEW.rowView(corto, { now: RNOW, projectFilter: '', maxChips: 1 });
+  assert.strictEqual(v.chips.length, 1);
+  assert.ok(/subagente/.test(v.chips[0].text));
+  assert.strictEqual(v.extra, 1);
+  const sin = RVIEW.rowView(s('z', 'idle', { title: 'z' }), { now: RNOW, projectFilter: '' });
+  assert.deepStrictEqual(sin.chips, []);
+  assert.strictEqual(sin.extra, 0);
+});
+
+test('rowView: proyecto oculto con filtro de proyecto activo', () => {
+  const x = s('p', 'idle', { title: 'algo', project: 'web-app' });
+  assert.strictEqual(RVIEW.rowView(x, { now: RNOW, projectFilter: '' }).project, 'web-app');
+  assert.strictEqual(RVIEW.rowView(x, { now: RNOW, projectFilter: 'web-app' }).project, null);
+  assert.strictEqual(RVIEW.rowView(s('q', 'idle', { title: 'x' }), { now: RNOW, projectFilter: '' }).project, null);
+});
+
+test('rowView: tooltip = away, o ask de idle, o proyecto · rama; ariaLabel con estado en texto y hora', () => {
+  const base = { title: 'Migración', project: 'web-app', branch: 'main', lastActivityAt: RNOW - 2 * RMIN };
+  const conAway = RVIEW.rowView(s('a', 'idle', Object.assign({ away: { text: '**Terminó** la migración' } }, base)), { now: RNOW, projectFilter: '' });
+  assert.strictEqual(conAway.tooltip, 'Terminó la migración');
+  const conAsk = RVIEW.rowView(s('b', 'idle', Object.assign({ ask: { kind: 'text', text: 'Listo, ¿sigo?' } }, base)), { now: RNOW, projectFilter: '' });
+  assert.strictEqual(conAsk.tooltip, 'Listo, ¿sigo?');
+  const plano = RVIEW.rowView(s('c', 'busy', base), { now: RNOW, projectFilter: '' });
+  assert.strictEqual(plano.tooltip, 'web-app · ⎇ main');
+  const esperando = RVIEW.rowView(s('d', 'waiting', base), { now: RNOW, projectFilter: '' });
+  assert.strictEqual(esperando.ariaLabel, 'Migración, esperándote, hace 2 min');
+  assert.strictEqual(esperando.when, 'hace 2 min');
+  assert.ok(/trabajando/.test(plano.ariaLabel));
+});
+
+test('rowView: texto hostil queda como texto (sin HTML interpretado, sin romper)', () => {
+  const x = s('h', 'idle', {
+    title: '<img src=x onerror=alert(1)> **negrita**',
+    project: '<script>alert(1)</script>',
+    away: { text: '<b onclick=x()>hola</b>' }
+  });
+  const v = RVIEW.rowView(x, { now: RNOW, projectFilter: '' });
+  assert.strictEqual(v.title, '<img src=x onerror=alert(1)> negrita');
+  assert.strictEqual(v.project, '<script>alert(1)</script>');
+  assert.strictEqual(v.tooltip, '<b onclick=x()>hola</b>');
+});
+
+test('rowView: sin fecha y estado desconocido no revientan', () => {
+  const v = RVIEW.rowView({ id: 'x', status: 'zzz' }, { now: RNOW, projectFilter: '' });
+  assert.strictEqual(v.status, 'idle');
+  assert.strictEqual(v.when, '—');
+  assert.strictEqual(v.title, 'x');
+});
+
+test('rowView sobre el fixture de lista: ninguna fila revienta y el tope se respeta', () => {
+  const fx = require('./fixture-lista.json');
+  assert.ok(fx.sessions.length >= 40);
+  fx.sessions.forEach((x) => {
+    const v = RVIEW.rowView(x, { now: fx.generatedAt, projectFilter: '' });
+    assert.ok(v.chips.length <= 2);
+    assert.strictEqual(typeof v.title, 'string');
+    assert.ok(v.ariaLabel.indexOf(v.when) !== -1);
+  });
+});
