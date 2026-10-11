@@ -48,7 +48,7 @@ expone el panel.
 ## 3. Tasks y orden
 | Task | Qué | Especialista | Modelo | Depende de | Estado |
 |------|-----|--------------|--------|------------|--------|
-| **TASK-030** | Flags del modo remoto, segundo listener loopback, store de estado 0600, rutas estáticas de la PWA | claude-dashboard-worker | sonnet | — | `pending` |
+| **TASK-030** | Flags del modo remoto, segundo listener loopback, store de estado 0600, rutas estáticas de la PWA | claude-dashboard-worker | sonnet | — | `done` |
 | **TASK-031** | Emparejamiento (token + código), cookie de dispositivo, gate del listener remoto, dispositivos y revocación | claude-dashboard-worker | sonnet | TASK-030 | `pending` |
 | **TASK-032** | Cifrado aes128gcm de Web Push (RFC 8291/8188) con el vector del RFC | claude-dashboard-worker | **opus** | — | `pending` |
 | **TASK-033** | Claves VAPID + JWT ES256 + envío HTTP al servicio de push + store de suscripciones | claude-dashboard-worker | sonnet | TASK-030, TASK-032 | `pending` |

@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -52,6 +53,11 @@ type Server struct {
 	Interval   time.Duration
 	Heartbeat  time.Duration
 	Logf       func(format string, args ...any)
+	// RemoteAddr: segundo listener loopback para `tailscale serve` (PLAN-011,
+	// DD-43). Vacío = un solo listener, como siempre.
+	RemoteAddr string
+	// PublicURL: origen https normalizado del modo remoto (DD-44); vacío = apagado.
+	PublicURL string
 
 	mu       sync.Mutex
 	hash     [32]byte
@@ -118,9 +124,47 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/sessions/{sessionId}/timeline", s.handleTimeline)
 	mux.HandleFunc("GET /api/history", s.handleHistory)
 	if s.Static != nil {
-		mux.Handle("/", http.FileServer(http.FS(s.Static)))
+		mux.Handle("/", staticHandler(s.Static))
 	}
 	return mux
+}
+
+// staticHandler sirve el frontend y fija las cabeceras de la PWA (DD-54):
+// *.webmanifest como application/manifest+json y /sw.js sin caché, para que
+// el navegador vea siempre la versión nueva del service worker.
+func staticHandler(fsys fs.FS) http.Handler {
+	files := http.FileServer(http.FS(fsys))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, ".webmanifest"):
+			w.Header().Set("Content-Type", "application/manifest+json")
+		case r.URL.Path == "/sw.js":
+			w.Header().Set("Cache-Control", "no-cache")
+		}
+		files.ServeHTTP(w, r)
+	})
+}
+
+type originKey struct{}
+
+// isRemote dice si la petición entró por el listener remoto (DD-43). Se decide
+// por el listener, no por RemoteAddr ni cabeceras: `tailscale serve` es un
+// proxy local y todo llega desde 127.0.0.1.
+func isRemote(r *http.Request) bool {
+	v, _ := r.Context().Value(originKey{}).(bool)
+	return v
+}
+
+// newHTTPServer arma un http.Server que marca el origen en el contexto de cada
+// conexión; BaseContext es por http.Server, de ahí que haya uno por listener.
+func (s *Server) newHTTPServer(remote bool) *http.Server {
+	return &http.Server{
+		Handler:           s.Handler(),
+		ReadHeaderTimeout: 10 * time.Second,
+		BaseContext: func(net.Listener) context.Context {
+			return context.WithValue(context.Background(), originKey{}, remote)
+		},
+	}
 }
 
 func (s *Server) snapshot() []byte {
@@ -285,26 +329,54 @@ func ValidateAddr(addr string, allowRemote bool) error {
 	return fmt.Errorf("addr %q no es loopback: el panel expone prompts; usá 127.0.0.1 o -allow-remote", addr)
 }
 
-// ListenAndServe arranca el poller y el HTTP; con ctx cancelado hace shutdown limpio.
+// ListenAndServe arranca el poller y el HTTP; con ctx cancelado hace shutdown
+// limpio. Si RemoteAddr != "" abre además el listener remoto (DD-43).
 func (s *Server) ListenAndServe(ctx context.Context, addr string) error {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("escuchando en %s: %w", addr, err)
 	}
+	var rln net.Listener
+	if s.RemoteAddr != "" {
+		rln, err = net.Listen("tcp", s.RemoteAddr)
+		if err != nil {
+			_ = ln.Close()
+			return fmt.Errorf("escuchando (remoto) en %s: %w", s.RemoteAddr, err)
+		}
+	}
+	return s.Serve(ctx, ln, rln)
+}
+
+// Serve hace lo mismo que ListenAndServe sobre listeners ya abiertos (remote
+// puede ser nil). Hay UN poller aunque haya dos listeners.
+func (s *Server) Serve(ctx context.Context, ln, remote net.Listener) error {
 	pctx, stopPoll := context.WithCancel(ctx)
 	defer stopPoll()
 	pollDone := make(chan struct{})
 	go func() { defer close(pollDone); s.Poll(pctx) }()
 
-	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
-	errc := make(chan error, 1)
-	go func() { errc <- srv.Serve(ln) }()
+	srvs := []*http.Server{s.newHTTPServer(false)}
+	lns := []net.Listener{ln}
+	if remote != nil {
+		srvs = append(srvs, s.newHTTPServer(true))
+		lns = append(lns, remote)
+	}
+	errc := make(chan error, len(srvs))
+	for i := range srvs {
+		go func(srv *http.Server, l net.Listener) { errc <- srv.Serve(l) }(srvs[i], lns[i])
+	}
 	s.logf("claude-dashboard escuchando en http://%s", ln.Addr())
+	if remote != nil {
+		s.logf("listener remoto (para tailscale serve) en http://%s", remote.Addr())
+	}
 
 	select {
 	case err := <-errc:
 		stopPoll()
 		<-pollDone
+		for _, srv := range srvs {
+			_ = srv.Close()
+		}
 		return fmt.Errorf("sirviendo: %w", err)
 	case <-ctx.Done():
 	}
@@ -319,9 +391,18 @@ func (s *Server) ListenAndServe(ctx context.Context, addr string) error {
 	s.mu.Unlock()
 	sctx, cancel := context.WithTimeout(context.Background(), shutdownGrace)
 	defer cancel()
-	if err := srv.Shutdown(sctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		_ = srv.Close()
-		return fmt.Errorf("shutdown: %w", err)
+	var wg sync.WaitGroup
+	errs := make([]error, len(srvs))
+	for i, srv := range srvs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := srv.Shutdown(sctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				_ = srv.Close()
+				errs[i] = fmt.Errorf("shutdown: %w", err)
+			}
+		}()
 	}
-	return nil
+	wg.Wait()
+	return errors.Join(errs...)
 }
