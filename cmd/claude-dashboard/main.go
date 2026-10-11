@@ -66,6 +66,8 @@ func run() error {
 	// Modo remoto (PLAN-011, DD-44): sin -public-url se ignoran los otros dos
 	// flags y NO se crea ningún directorio.
 	var publicOrigin, remoteListen string
+	var pairing *remote.Pairing
+	var devices *remote.Devices
 	if *publicURL != "" {
 		origin, err := remote.ParsePublicURL(*publicURL)
 		if err != nil {
@@ -124,6 +126,8 @@ func run() error {
 		Logf:       log.Printf,
 		PublicURL:  publicOrigin,
 		RemoteAddr: remoteListen,
+		Pairing:    pairing,
+		Devices:    devices,
 	}
 	return s.ListenAndServe(ctx, *addr)
 }

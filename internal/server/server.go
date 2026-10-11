@@ -18,6 +18,7 @@ import (
 	"claude-dashboard/internal/agents"
 	"claude-dashboard/internal/history"
 	"claude-dashboard/internal/orq"
+	"claude-dashboard/internal/remote"
 	"claude-dashboard/internal/transcript"
 )
 
@@ -58,6 +59,9 @@ type Server struct {
 	RemoteAddr string
 	// PublicURL: origen https normalizado del modo remoto (DD-44); vacío = apagado.
 	PublicURL string
+	// Pairing y Devices: emparejamiento y dispositivos (DD-46..49); solo con PublicURL.
+	Pairing *remote.Pairing
+	Devices *remote.Devices
 
 	mu       sync.Mutex
 	hash     [32]byte
@@ -65,6 +69,8 @@ type Server struct {
 	current  []byte
 	sessions []agents.Session
 	subs     map[chan []byte]struct{}
+	// subDev: deviceId de los suscriptores SSE remotos (DD-49), para cortarlos al revocar.
+	subDev map[chan []byte]string
 
 	// waitMu protege waitLog: sessionId → último motivo logueado de "espera sin ask".
 	waitMu  sync.Mutex
@@ -81,7 +87,10 @@ func (s *Server) logf(format string, args ...any) {
 
 // subscribe registra un suscriptor con canal buffered y devuelve el snapshot
 // actual (nil si todavía no hay).
-func (s *Server) subscribe() (chan []byte, []byte) {
+func (s *Server) subscribe() (chan []byte, []byte) { return s.subscribeDevice("") }
+
+// subscribeDevice asocia el suscriptor a un dispositivo ("" = local).
+func (s *Server) subscribeDevice(deviceID string) (chan []byte, []byte) {
 	ch := make(chan []byte, subBuffer)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -89,16 +98,29 @@ func (s *Server) subscribe() (chan []byte, []byte) {
 		s.subs = map[chan []byte]struct{}{}
 	}
 	s.subs[ch] = struct{}{}
+	if deviceID != "" {
+		if s.subDev == nil {
+			s.subDev = map[chan []byte]string{}
+		}
+		s.subDev[ch] = deviceID
+	}
 	return ch, s.current
+}
+
+// dropLocked saca y cierra el canal; s.mu tomado. Único camino de cierre, así
+// broadcast, revocación, unsubscribe y shutdown no cierran dos veces.
+func (s *Server) dropLocked(ch chan []byte) {
+	if _, ok := s.subs[ch]; ok {
+		delete(s.subs, ch)
+		delete(s.subDev, ch)
+		close(ch)
+	}
 }
 
 func (s *Server) unsubscribe(ch chan []byte) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.subs[ch]; ok {
-		delete(s.subs, ch)
-		close(ch)
-	}
+	s.dropLocked(ch)
 }
 
 // broadcast nunca bloquea: el suscriptor con el buffer lleno se descarta.
@@ -123,10 +145,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/events", s.handleEvents)
 	mux.HandleFunc("GET /api/sessions/{sessionId}/timeline", s.handleTimeline)
 	mux.HandleFunc("GET /api/history", s.handleHistory)
+	s.registerRemote(mux)
 	if s.Static != nil {
 		mux.Handle("/", staticHandler(s.Static))
 	}
-	return mux
+	return s.gate(mux)
 }
 
 // staticHandler sirve el frontend y fija las cabeceras de la PWA (DD-54):
@@ -266,8 +289,15 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Connection", "keep-alive")
 
-	ch, cur := s.subscribe()
+	dev := deviceID(r)
+	ch, cur := s.subscribeDevice(dev)
 	defer s.unsubscribe(ch)
+	// Carrera con la revocación: si el dispositivo se revocó entre el gate y el
+	// registro, closeDevice ya pasó y no nos vio; lo cortamos acá.
+	if dev != "" && !s.Devices.Has(dev) {
+		http.Error(w, `{"error":"unpaired"}`, http.StatusUnauthorized)
+		return
+	}
 
 	if cur == nil { // aún no hubo ciclo: intento uno para no dejar al cliente en blanco
 		if _, err := s.Refresh(r.Context()); err != nil {
@@ -385,8 +415,7 @@ func (s *Server) Serve(ctx context.Context, ln, remote net.Listener) error {
 	// SSE son conexiones largas: cerramos suscriptores para que Shutdown no espere.
 	s.mu.Lock()
 	for ch := range s.subs {
-		delete(s.subs, ch)
-		close(ch)
+		s.dropLocked(ch)
 	}
 	s.mu.Unlock()
 	sctx, cancel := context.WithTimeout(context.Background(), shutdownGrace)
