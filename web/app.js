@@ -1380,13 +1380,15 @@
     // Lista vacía pero con sesiones esperando: están en la bandeja, no es "no hay sesiones" (DD-39).
     var empty = $('empty');
     var waitingVis = inboxKeys.length ? vis.filter(function (s) { return isWaiting(s.status) && !isAbandoned(s, now); }).length : 0;
-    if (listed > 0) {
-      empty.hidden = true;
-    } else if (waitingVis > 0) {
+    // Las abandonadas tienen su grupo plegado: no cuentan como lista "con algo" para este aviso.
+    var listedLive = listed - (by.abandoned ? by.abandoned.sessions.length : 0);
+    if (listedLive === 0 && waitingVis > 0) {
       empty.textContent = waitingVis === 1
         ? 'La sesión que te espera está arriba, en Te esperan.'
         : 'Las ' + waitingVis + ' sesiones que te esperan están arriba, en Te esperan.';
       empty.hidden = false;
+    } else if (listed > 0) {
+      empty.hidden = true;
     } else {
       empty.textContent = 'No hay sesiones para mostrar.';
       empty.hidden = vis.length > 0;
