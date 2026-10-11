@@ -4,7 +4,7 @@
 - **Especialista:** claude-dashboard-worker (sonnet)
 - **Proyecto:** claude-dashboard (`~/personal/claude-dashboard`), rama de la task desde `main`
 - **Depende de:** TASK-030 (headers de `sw.js` y manifest) · **blanda:** PLAN-010 si este toca `web/index.html` o `web/embed.go`
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -59,10 +59,28 @@ service worker que recibe push y muestra el aviso con la app cerrada, sin cachea
 - iOS ignora parte del manifest y usa `apple-touch-icon` y las metas `apple-*`: por eso van las dos cosas.
 
 ## Resultado
-<!-- SE LLENA AL CERRAR -->
-- **Estado final:**
-- **Resumen:**
-- **Archivos tocados:**
-- **Verificado por:**
-- **Desviaciones:**
-- **Riesgos abiertos / siguiente:**
+- **Estado final:** `done`
+- **Resumen:** El panel es instalable como PWA: manifest (standalone, 3 íconos), 4 PNG, `sw.js` con
+  precache del shell `cd-shell-v1`, network-first, push que SIEMPRE muestra aviso (genérico si el
+  JSON no parsea) y `notificationclick` que solo acepta `url` que empieza con `/` y no con `//`.
+  `/api/*` y `fixture*.json` no se interceptan. El registro del SW queda para TASK-036.
+- **Archivos tocados:** commit `a17178b` — creados `web/manifest.webmanifest`, `web/sw.js`,
+  `web/sw.test.js`, `web/embed_test.go`, `web/icons/{icon-192,icon-512,icon-maskable-512,apple-touch-icon}.png`;
+  modificados `web/embed.go`, `web/index.html` (solo `<head>`), `internal/server/server_test.go`
+  (test con el FS real embebido).
+- **Verificado por:** en el worktree: `gofmt -l .` vacío; `go vet ./...` limpio;
+  `go test -race ./...` todo `ok` (agents, history, orq, plans, remote, server, transcript, webpush, web);
+  `node --check web/sw.js` ok; `node --test web/` 88 pass / 0 fail. `grep` en `sw.js`: no hay
+  `cache.put` ni `/api` en el precache (solo el guard de `shouldHandle` y comentarios).
+- **Desviaciones:** (1) `embed_test.go` en `web/` además del test en `server_test.go` (cubre
+  tamaño de PNG y que `sw.test.js` no se embebe). (2) `shouldHandle(url, method?, origin?)`: la
+  task lo invoca con un solo argumento. (3) Bloqueé también `/\` en `safeUrl` y excluí `/sw.js`
+  del fetch handler. (4) Maskable y apple-touch con fondo sólido `#121418` (iOS pinta la
+  transparencia de negro).
+- **Íconos:** generados con un programa Go descartable (`image`, `image/png`, supermuestreo 4x4)
+  en `/tmp/cd-icons-gen`, fuera del repo: círculo `#d97757`; 192/512 transparentes (radio 0.875,
+  como el favicon), maskable 512 con círculo al 60 % del lado sobre `#121418`, apple 180 al 75 %.
+- **Riesgos abiertos / siguiente:** instalación real en Android/iOS NO verificada (TASK-038).
+  `theme_color` del manifest es fijo claro (`#f4f5f7`); el `<meta>` sí varía por esquema.
+  TASK-036 debe registrar el SW (`serviceWorker` + `isSecureContext`). PLAN-010 ya estaba
+  mergeado: sin conflicto en `index.html`.
