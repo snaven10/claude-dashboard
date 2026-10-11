@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -952,4 +953,180 @@ func TestFoundNotInContract(t *testing.T) {
 			t.Errorf("campo nuevo en el contrato: %q", k)
 		}
 	}
+}
+
+// serveOn arranca s.Serve sobre listeners efímeros y devuelve sus URLs.
+func serveOn(t *testing.T, s *Server, withRemote bool) (localURL, remoteURL string, done <-chan error, cancel context.CancelFunc) {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rln net.Listener
+	if withRemote {
+		if rln, err = net.Listen("tcp", "127.0.0.1:0"); err != nil {
+			t.Fatal(err)
+		}
+		remoteURL = "http://" + rln.Addr().String()
+	}
+	ctx, c := context.WithCancel(context.Background())
+	d := make(chan error, 1)
+	go func() { d <- s.Serve(ctx, ln, rln) }()
+	return "http://" + ln.Addr().String(), remoteURL, d, c
+}
+
+func TestIsRemoteByListenerAndSameSnapshot(t *testing.T) {
+	var calls atomic.Int32
+	s := newTestServer(func(context.Context) ([]agents.Session, error) {
+		calls.Add(1)
+		return fakeSessions(2), nil
+	})
+	s.Interval = 20 * time.Millisecond
+
+	// Sonda: un wrapper de test sobre el handler real, para ver isRemote.
+	probe := func(remote bool) *http.Server {
+		srv := s.newHTTPServer(remote)
+		inner := srv.Handler
+		srv.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/__origin" {
+				fmt.Fprint(w, isRemote(r))
+				return
+			}
+			inner.ServeHTTP(w, r)
+		})
+		return srv
+	}
+	var urls [2]string
+	for i, remote := range []bool{false, true} {
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		srv := probe(remote)
+		go func() { _ = srv.Serve(ln) }()
+		t.Cleanup(func() { _ = srv.Close() })
+		urls[i] = "http://" + ln.Addr().String()
+	}
+	get := func(u string) string {
+		t.Helper()
+		resp, err := http.Get(u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var sb strings.Builder
+		if _, err := bufio.NewReader(resp.Body).WriteTo(&sb); err != nil {
+			t.Fatal(err)
+		}
+		return sb.String()
+	}
+	if got := get(urls[0] + "/__origin"); got != "false" {
+		t.Errorf("listener local: isRemote = %s", got)
+	}
+	if got := get(urls[1] + "/__origin"); got != "true" {
+		t.Errorf("listener remoto: isRemote = %s", got)
+	}
+
+	// Con Serve real: los dos listeners entregan el mismo snapshot y hay UN poller.
+	s2 := newTestServer(func(context.Context) ([]agents.Session, error) {
+		calls.Add(1)
+		return fakeSessions(2), nil
+	})
+	s2.Interval = 20 * time.Millisecond
+	local, rem, done, cancel := serveOn(t, s2, true)
+	defer cancel()
+	a, b := get(local+"/api/sessions"), get(rem+"/api/sessions")
+	if a == "" || a != b {
+		t.Fatalf("snapshots distintos:\n%s\n%s", a, b)
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("shutdown: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("shutdown colgado con dos listeners")
+	}
+}
+
+func TestSingleListenerWithoutRemoteAddr(t *testing.T) {
+	s := newTestServer(func(context.Context) ([]agents.Session, error) { return fakeSessions(1), nil })
+	s.Interval = 20 * time.Millisecond
+	// Sin RemoteAddr, ListenAndServe abre un solo listener: puerto remoto libre.
+	probe, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	probeAddr := probe.Addr().String()
+	_ = probe.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- s.ListenAndServe(ctx, "127.0.0.1:0") }()
+	time.Sleep(100 * time.Millisecond)
+	if c, err := net.DialTimeout("tcp", probeAddr, 200*time.Millisecond); err == nil {
+		c.Close()
+		t.Fatal("hay un listener inesperado")
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestListenAndServeRemoteAddr(t *testing.T) {
+	probe, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	remoteAddr := probe.Addr().String()
+	_ = probe.Close()
+	s := newTestServer(func(context.Context) ([]agents.Session, error) { return fakeSessions(1), nil })
+	s.Interval = 20 * time.Millisecond
+	s.RemoteAddr = remoteAddr
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- s.ListenAndServe(ctx, "127.0.0.1:0") }()
+	var resp *http.Response
+	for i := 0; i < 50; i++ {
+		if resp, err = http.Get("http://" + remoteAddr + "/api/sessions"); err == nil {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err != nil {
+		t.Fatalf("listener remoto no abrió: %v", err)
+	}
+	resp.Body.Close()
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestStaticPWAHeaders(t *testing.T) {
+	s := newTestServer(func(context.Context) ([]agents.Session, error) { return nil, nil })
+	s.Static = fstest.MapFS{
+		"index.html":           {Data: []byte("<html></html>")},
+		"manifest.webmanifest": {Data: []byte(`{"name":"x"}`)},
+		"sw.js":                {Data: []byte("self.x=1")},
+	}
+	ts := httptest.NewServer(s.Handler())
+	defer ts.Close()
+	check := func(path, header, want string) {
+		t.Helper()
+		resp, err := http.Get(ts.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != 200 {
+			t.Fatalf("%s: status %d", path, resp.StatusCode)
+		}
+		if got := resp.Header.Get(header); got != want {
+			t.Errorf("%s: %s = %q; quería %q", path, header, got, want)
+		}
+	}
+	check("/manifest.webmanifest", "Content-Type", "application/manifest+json")
+	check("/sw.js", "Cache-Control", "no-cache")
 }
