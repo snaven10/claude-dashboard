@@ -17,6 +17,8 @@
         <button type="button" id="c-waiting" class="counter c-waiting" aria-pressed="false" title="Filtrar por este estado (1)"><b id="n-waiting">0</b> esperándote</button>
         <button type="button" id="c-busy" class="counter c-busy" aria-pressed="false" title="Filtrar por este estado (2)"><b id="n-busy">0</b> trabajando</button>
         <button type="button" id="c-idle" class="counter c-idle" aria-pressed="false" title="Filtrar por este estado (3)"><b id="n-idle">0</b> idle</button>
+        <button type="button" id="btn-done" class="counter-link" hidden title="Ir al grupo de terminadas"><b id="n-done">0</b> terminadas</button>
+        <button type="button" id="btn-abandoned" class="counter-link" hidden title="Ir al grupo de abandonadas"><b id="n-abandoned">0</b> abandonadas</button>
         <span id="today" class="today" hidden></span>
       </div>
     </div>
@@ -38,7 +40,7 @@
   <main>
     <section class="inbox" aria-labelledby="inbox-title">
       <h2 id="inbox-title">Te esperan</h2>
-      <div id="inbox-items" class="inbox-items"></div>
+      <div id="inbox-items" class="inbox-items" role="listbox" aria-label="Te esperan"></div>
     </section>
     <p id="empty" class="empty" hidden>No hay sesiones para mostrar.</p>
     <div class="split">

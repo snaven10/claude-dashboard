@@ -331,6 +331,43 @@
     return { live: live, abandoned: abandoned };
   }
 
+  // DD-38/DD-39: grupos de la lista por estado. Las waiting/blocked NO abandonadas no entran
+  // (viven solo en la bandeja); las abandonadas van a su grupo. Sin grupos vacíos. Dentro de
+  // "Terminadas" las recientes (< 24 h) van antes que las viejas, conservando el orden de entrada.
+  var GROUP_LABEL = { busy: 'Trabajando', idle: 'Idle', done: 'Terminadas', abandoned: 'Abandonadas' };
+
+  function statusGroups(list, now) {
+    var by = { busy: [], idle: [], done: [], abandoned: [] };
+    var oldDone = [];
+    (Array.isArray(list) ? list : []).forEach(function (s) {
+      if (isWaiting(s.status)) {
+        if (isAbandoned(s, now)) by.abandoned.push(s);
+      } else if (s.status === 'busy') {
+        by.busy.push(s);
+      } else if (s.status === 'done') {
+        (isOldDone(s, now) ? oldDone : by.done).push(s);
+      } else {
+        by.idle.push(s);
+      }
+    });
+    by.done = by.done.concat(oldDone);
+    return ['busy', 'idle', 'done', 'abandoned'].filter(function (id) {
+      return by[id].length > 0;
+    }).map(function (id) {
+      return { id: id, label: GROUP_LABEL[id], sessions: by[id] };
+    });
+  }
+
+  // Números del encabezado de la página: terminadas (todas) y abandonadas.
+  function listTotals(list, now) {
+    var t = { done: 0, abandoned: 0 };
+    (Array.isArray(list) ? list : []).forEach(function (s) {
+      if (isAbandoned(s, now)) t.abandoned++;
+      else if (s && s.status === 'done') t.done++;
+    });
+    return t;
+  }
+
   // DD-34: j/k sobre la lista visible; en los bordes se queda (no da la vuelta).
   // Sin selección válida cae en el primero. Lista vacía → null.
   function stepSelection(keys, current, delta) {
@@ -524,6 +561,7 @@
         turnMinutes: turnMinutes, awayLine: awayLine, sessionChips: sessionChips,
         rowView: rowView, agoFrom: agoFrom,
         isAbandoned: isAbandoned, counts: counts, inboxItems: inboxItems, splitAbandoned: splitAbandoned,
+        statusGroups: statusGroups, listTotals: listTotals,
         stepSelection: stepSelection, plainText: plainText, oneLine: oneLine, todayView: todayView,
         notifyTargets: notifyTargets, formatTokens: formatTokens, totalTokens: totalTokens,
         groupByPlan: groupByPlan, orqLabel: orqLabel, planKey: planKey, planHeading: planHeading, planProgress: planProgress,
@@ -914,7 +952,8 @@
   var selectedKey = readSelected();
   var phoneDetail = false; // teléfono: pantalla de detalle abierta
   var qrOpenFor = ''; // clave de la sesión con el QR desplegado en el detalle
-  var navKeys = []; // claves en el orden en que se ven las filas (para j/k)
+  var navKeys = []; // claves en el orden en que se ven (bandeja primero, luego filas) para j/k
+  var inboxKeys = []; // claves de las tarjetas de la bandeja, en su orden (DD-39)
   var detailSig = '';
   var historyToday = null;
   var timeline = { key: '', at: 0, status: 'idle', events: [], req: 0, version: 0 };
@@ -1039,54 +1078,116 @@
     return h;
   }
 
-  // Sección plegable (terminadas viejas / abandonadas).
-  function fold(label, open, onToggle, items) {
+  function sessionsLabel(n) { return n + (n === 1 ? ' sesión' : ' sesiones'); }
+
+  // Grupo plegable (terminadas / abandonadas, DD-38): el encabezado es una fila completa con
+  // contador, visible aunque esté plegado. `id` es el ancla de los botones del encabezado de página.
+  function fold(id, label, title, open, onToggle, items) {
     var sec = el('div', 'fold');
-    var tg = btn((open ? '▾ ' : '▸ ') + label, 'fold-toggle');
+    sec.id = id;
+    sec.setAttribute('role', 'group');
+    sec.setAttribute('aria-label', label + ', ' + sessionsLabel(items.length));
+    var tg = btn((open ? '▾ ' : '▸ ') + label + ' (' + items.length + ')', 'fold-toggle');
     tg.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (title) tg.title = title;
     tg.addEventListener('click', onToggle);
     sec.appendChild(tg);
     if (open) items.forEach(function (s) { navKeys.push(sessionKey(s)); sec.appendChild(row(s)); });
     return sec;
   }
 
+  // Grupo no plegable (Trabajando / Idle): encabezado con contador + sus filas.
+  function statusSection(g) {
+    var sec = el('div', 'status-group');
+    sec.setAttribute('role', 'group');
+    sec.setAttribute('aria-label', g.label + ', ' + sessionsLabel(g.sessions.length));
+    var h = el('div', 'group-h status-h');
+    h.appendChild(el('strong', null, g.label));
+    h.appendChild(document.createTextNode(' (' + g.sessions.length + ')'));
+    sec.appendChild(h);
+    g.sessions.forEach(function (s) { navKeys.push(sessionKey(s)); sec.appendChild(row(s)); });
+    return sec;
+  }
+
+  function toggleDone() {
+    showOldOn = !showOldOn;
+    writeFlag(OLD_KEY, showOldOn);
+    render();
+  }
+
+  function toggleAbandoned() {
+    showAbandonedOn = !showAbandonedOn;
+    writeFlag(ABN_KEY, showAbandonedOn);
+    render();
+  }
+
   function renderList(now) {
     var vis = sorted(visible(sessions));
-    var ab = splitAbandoned(vis, now);
-    var parts = splitOldDone(ab.live, now);
+    var groups = statusGroups(vis, now);
+    var by = {};
+    groups.forEach(function (g) { by[g.id] = g; });
     var nodes = [];
-    navKeys = [];
-    function add(s) { navKeys.push(sessionKey(s)); nodes.push(row(s)); }
+    navKeys = inboxKeys.slice(); // DD-39: la bandeja entra primero en j/k
+    var listed = 0;
+    groups.forEach(function (g) { listed += g.sessions.length; });
+    var totals = listTotals(vis, now);
+    var abn = by.abandoned ? by.abandoned.sessions : [];
+    var doneShown = totals.done;
+
     if (groupByPlanOn) {
-      groupByPlan(parts.recent).forEach(function (g) {
+      // Por plan: dentro de cada plan, orden por estado (busy, idle, terminadas recientes).
+      var doneParts = splitOldDone(by.done ? by.done.sessions : [], now);
+      var live = [].concat(by.busy ? by.busy.sessions : [], by.idle ? by.idle.sessions : [], doneParts.recent);
+      groupByPlan(live).forEach(function (g) {
         nodes.push(groupHead(g));
-        g.sessions.forEach(add);
+        g.sessions.forEach(function (s) { navKeys.push(sessionKey(s)); nodes.push(row(s)); });
       });
+      doneShown = doneParts.old.length;
+      if (doneParts.old.length) {
+        nodes.push(fold('grp-done', 'Terminadas hace más de 1 día', '', showOldOn, toggleDone, doneParts.old));
+      }
     } else {
-      parts.recent.forEach(add);
+      groups.forEach(function (g) {
+        if (g.id === 'busy' || g.id === 'idle') nodes.push(statusSection(g));
+        else if (g.id === 'done') nodes.push(fold('grp-done', g.label, '', showOldOn, toggleDone, g.sessions));
+      });
     }
-    if (parts.old.length) {
-      nodes.push(fold(parts.old.length + ' terminadas hace más de 1 día', showOldOn, function () {
-        showOldOn = !showOldOn;
-        writeFlag(OLD_KEY, showOldOn);
-        render();
-      }, parts.old));
+    if (abn.length) {
+      nodes.push(fold('grp-abandoned', 'Abandonadas',
+        'Esperan hace más de 24 h. No cuentan en el contador ni en los avisos; no se borra nada.',
+        showAbandonedOn, toggleAbandoned, abn));
     }
-    if (ab.abandoned.length) {
-      nodes.push(fold(ab.abandoned.length + ' abandonadas: esperan hace más de 24 h. No cuentan en el contador ni en los avisos; no se borra nada.',
-        showAbandonedOn, function () {
-          showAbandonedOn = !showAbandonedOn;
-          writeFlag(ABN_KEY, showAbandonedOn);
-          render();
-        }, ab.abandoned));
-    }
+
+    // Botones del encabezado de página (no son filtros).
+    var bd = $('btn-done');
+    bd.hidden = doneShown === 0;
+    $('n-done').textContent = doneShown;
+    var ba = $('btn-abandoned');
+    ba.hidden = totals.abandoned === 0;
+    $('n-abandoned').textContent = totals.abandoned;
+
     var rows = $('rows');
     rows.replaceChildren.apply(rows, nodes);
-    $('empty').hidden = vis.length > 0;
+
+    // Lista vacía pero con sesiones esperando: están en la bandeja, no es "no hay sesiones" (DD-39).
+    var empty = $('empty');
+    var waitingVis = inboxKeys.length ? vis.filter(function (s) { return isWaiting(s.status) && !isAbandoned(s, now); }).length : 0;
+    if (listed > 0) {
+      empty.hidden = true;
+    } else if (waitingVis > 0) {
+      empty.textContent = waitingVis === 1
+        ? 'La sesión que te espera está arriba, en Te esperan.'
+        : 'Las ' + waitingVis + ' sesiones que te esperan están arriba, en Te esperan.';
+      empty.hidden = false;
+    } else {
+      empty.textContent = 'No hay sesiones para mostrar.';
+      empty.hidden = vis.length > 0;
+    }
   }
 
   function renderInbox(now) {
     var items = inboxItems(sessions, now);
+    inboxKeys = items.map(sessionKey);
     $('inbox-title').textContent = 'Te esperan' + (items.length ? ' (' + items.length + ')' : '');
     var box = $('inbox-items');
     box.parentNode.classList.toggle('empty', !items.length); // vacía: una sola línea, deja lugar a la lista
@@ -1097,6 +1198,15 @@
     box.replaceChildren.apply(box, items.map(function (s) {
       var key = sessionKey(s);
       var c = el('article', 'ask-card');
+      // Navegable como una fila (DD-39): data-key, foco, selección y click fuera de sus botones.
+      c.setAttribute('role', 'option');
+      c.tabIndex = 0;
+      c.dataset.key = key;
+      c.setAttribute('aria-selected', key === selectedKey ? 'true' : 'false');
+      c.addEventListener('click', function (ev) {
+        if (ev.target.closest && ev.target.closest('button')) return;
+        select(key, true);
+      });
       // Renglón 1: título · proyecto · hora + acciones a la derecha. Renglón 2: motivo en una línea.
       var h = el('header');
       h.appendChild(el('strong', null, titleOf(s)));
@@ -1432,8 +1542,9 @@
     }
   }
 
+  // Filas de la lista y tarjetas de la bandeja.
   function rowByKey(k) {
-    var rows = $('rows').querySelectorAll('.row');
+    var rows = document.querySelectorAll('#rows .row, #inbox-items .ask-card');
     for (var i = 0; i < rows.length; i++) if (rows[i].dataset.key === k) return rows[i];
     return null;
   }
@@ -1453,7 +1564,7 @@
     document.title = c.waiting > 0 ? '(' + c.waiting + ') esperándote — ' + BASE_TITLE : BASE_TITLE;
 
     var ae = document.activeElement;
-    var focusKey = opts.focusKey || (ae && ae.classList && ae.classList.contains('row') ? ae.dataset.key : '');
+    var focusKey = opts.focusKey || (ae && ae.classList && (ae.classList.contains('row') || ae.classList.contains('ask-card')) ? ae.dataset.key : '');
     var y = window.scrollY;
 
     renderInbox(now);
@@ -1461,7 +1572,7 @@
     if (sessions.length && !selectedSession()) {
       // selección inexistente (o nunca elegida): la primera fila, sin guardarla
       selectedKey = navKeys[0] || '';
-      var rs = $('rows').querySelectorAll('.row');
+      var rs = document.querySelectorAll('#rows .row, #inbox-items .ask-card');
       for (var i = 0; i < rs.length; i++) rs[i].setAttribute('aria-selected', rs[i].dataset.key === selectedKey ? 'true' : 'false');
     }
     renderDetail();
@@ -1536,6 +1647,19 @@
         saveFilters();
         render();
       });
+    });
+
+    // DD-38: botones del encabezado; despliegan su grupo y lo traen a la vista (no son filtros).
+    function revealGroup(id, isOpen, toggle) {
+      if (!isOpen()) toggle();
+      var g = document.getElementById(id);
+      if (g && g.scrollIntoView) g.scrollIntoView({ block: 'nearest' });
+    }
+    $('btn-done').addEventListener('click', function () {
+      revealGroup('grp-done', function () { return showOldOn; }, toggleDone);
+    });
+    $('btn-abandoned').addEventListener('click', function () {
+      revealGroup('grp-abandoned', function () { return showAbandonedOn; }, toggleAbandoned);
     });
 
     var chkGroup = $('f-group');

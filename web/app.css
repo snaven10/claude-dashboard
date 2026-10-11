@@ -156,6 +156,9 @@ h2 { margin: 0 0 6px; font-size: 0.75rem; text-transform: uppercase; letter-spac
   gap: 4px;
   min-width: 0;
 }
+.ask-card { cursor: pointer; }
+.ask-card[aria-selected="true"] { background: var(--hover); box-shadow: inset 0 0 0 2px var(--accent); }
+.ask-card:focus-visible { outline-offset: 2px; }
 .ask-card header { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .ask-card header strong { flex: 1 1 0; min-width: 0; }
 .ask-card header .meta { flex: 0 1 auto; min-width: 0; display: block; max-width: 16ch; }
@@ -220,8 +223,13 @@ h2 { margin: 0 0 6px; font-size: 0.75rem; text-transform: uppercase; letter-spac
 .chip.err { background: var(--warn-bg); color: var(--warn); font-weight: 600; }
 .chip.warn { background: var(--stale-bg); color: var(--stale); }
 
-.fold { border-top: 1px solid var(--border); }
-.fold-toggle { width: 100%; text-align: left; white-space: normal; border: 0; border-radius: 0; background: var(--bg); color: var(--muted); padding: 8px 12px; }
+.fold, .status-group { border-top: 1px solid var(--border); }
+.rows > :first-child { border-top: 0; }
+.status-h { display: block; padding: 4px 12px; border-top: 0; }
+.fold-toggle { width: 100%; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 0; border-radius: 0; background: var(--bg); color: var(--muted); padding: 4px 12px; font-weight: 600; }
+button.counter-link { font-size: 0.85rem; padding: 2px 8px; border-radius: 999px; background: none; color: var(--muted); border-color: var(--border); }
+button.counter-link[hidden] { display: none; }
+button.counter-link b { font-size: 1rem; color: var(--fg); }
 .fold .row { opacity: 0.75; }
 .group-tokens { font-weight: 400; }
 
