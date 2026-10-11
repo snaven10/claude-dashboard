@@ -128,6 +128,49 @@
     return null;
   }
 
+  // DD-41: motivo de espera en castellano. Nunca devuelve el `waitingFor` crudo de F1 si es genérico.
+  var WAIT_LABELS = {
+    'permission prompt': 'pide permiso en la terminal',
+    'dialog open': 'tiene un diálogo abierto en la terminal',
+    'input needed': 'espera tu respuesta'
+  };
+  function waitingLabel(wf) {
+    var raw = plainText(wf);
+    if (!raw) return 'necesita tu atención';
+    return WAIT_LABELS[raw.toLowerCase()] || raw;
+  }
+
+  // -> { label, text, context, more }. Con `ask`: como askView en modo big. Sin `ask`: etiqueta por
+  // waitingFor y contexto (última acción o último pedido); text queda ''.
+  function waitView(s) {
+    s = s || {};
+    var a = s.ask;
+    if (a && typeof a.text === 'string' && a.text) {
+      var more = typeof a.more === 'number' && a.more > 0 ? a.more : 0;
+      return {
+        label: a.kind === 'tool' ? 'pide permiso:' : a.kind === 'question' ? 'pregunta:' : 'último mensaje:',
+        text: plainText(a.text),
+        context: '',
+        more: more > 0 ? '+' + more + (more === 1 ? ' pregunta' : ' preguntas') : ''
+      };
+    }
+    var context = '';
+    var la = s.lastAction;
+    if (la && typeof la.text === 'string' && oneLine(la.text)) {
+      context = 'lo último: ▸ ' + oneLine(la.text);
+    } else {
+      var lp = plainText(s.lastPrompt);
+      if (lp) context = 'tu último pedido: ' + (lp.length > 120 ? lp.slice(0, 119) + '…' : lp);
+    }
+    return { label: waitingLabel(s.waitingFor), text: '', context: context, more: '' };
+  }
+
+  // Texto plano completo (title, aviso): "label texto" o "label · contexto".
+  function waitFull(v) {
+    if (v.text) return v.label + ' ' + v.text + (v.more ? ' ' + v.more : '');
+    return v.label + (v.context ? ' · ' + v.context : '');
+  }
+
   // DD-22/DD-25: insignia solo con `high`; con count > 0 sin high, solo tooltip.
   function errorsView(e) {
     if (!e || typeof e.count !== 'number' || e.count <= 0) return null;
@@ -652,7 +695,7 @@
         stepSelection: stepSelection, plainText: plainText, oneLine: oneLine, todayView: todayView,
         notifyTargets: notifyTargets, formatTokens: formatTokens, totalTokens: totalTokens,
         groupByPlan: groupByPlan, orqLabel: orqLabel, planKey: planKey, planHeading: planHeading, planProgress: planProgress,
-        askView: askView, errorsView: errorsView, faviconLabel: faviconLabel,
+        askView: askView, waitView: waitView, waitingLabel: waitingLabel, waitFull: waitFull, errorsView: errorsView, faviconLabel: faviconLabel,
         toggleStatusFilter: toggleStatusFilter, matchesStatus: matchesStatus,
         formatContext: formatContext, contextTitle: contextTitle, rateTitle: rateTitle,
         planTotals: planTotals, isOldDone: isOldDone, splitOldDone: splitOldDone,
@@ -890,7 +933,7 @@
     targets.forEach(function (s) {
       try {
         var n = new Notification((s.title || s.name || s.id) + ' — esperándote', {
-          body: (s.project ? s.project + ': ' : '') + (s.waitingFor || (s.lastAction && s.lastAction.text) || 'necesita tu atención'),
+          body: (s.project ? s.project + ': ' : '') + waitFull(waitView(s)),
           tag: 'claude-dashboard-' + rowKey(s)
         });
         n.onclick = function () { window.focus(); n.close(); };
@@ -1337,18 +1380,13 @@
       h.appendChild(el('strong', null, titleOf(s)));
       h.appendChild(el('span', 'meta', [s.project, s.branch ? '⎇ ' + s.branch : null].filter(Boolean).join(' · ')));
       h.appendChild(el('span', 'help', ago(s.lastActivityAt || s.startedAt)));
-      var av = askView(s);
+      var wv = waitView(s);
       var q = el('div', 'ask-q');
-      var full;
-      if (av) {
-        q.appendChild(el('span', 'lbl', av.label));
-        q.appendChild(document.createTextNode(plainText(av.text)));
-        if (av.more) q.appendChild(el('span', 'lbl', ' ' + av.more));
-        full = av.label + ' ' + plainText(av.text) + (av.more ? ' ' + av.more : '');
-      } else {
-        full = s.waitingFor || 'necesita tu atención';
-        q.appendChild(document.createTextNode(full));
-      }
+      q.appendChild(el('span', 'lbl', wv.label));
+      if (wv.text) q.appendChild(document.createTextNode(wv.text));
+      else if (wv.context) q.appendChild(document.createTextNode('· ' + wv.context));
+      if (wv.more) q.appendChild(el('span', 'lbl', ' ' + wv.more));
+      var full = waitFull(wv);
       q.title = full;
       var a = el('div', 'ask-actions');
       var open = btn('ver detalle');
@@ -1563,7 +1601,10 @@
       }
     }
 
-    if (s.waitingFor) nodes.push(el('div', 'waiting-for', s.waitingFor));
+    if (!av && (s.waitingFor || isWaiting(s.status))) {
+      var wv = waitView(s);
+      nodes.push(el('div', 'waiting-for', waitFull(wv)));
+    }
 
     if (s.lastPrompt) {
       var p = el('p', 'prompt' + (expanded.has(s.id) ? ' open' : ''), plainText(s.lastPrompt));
