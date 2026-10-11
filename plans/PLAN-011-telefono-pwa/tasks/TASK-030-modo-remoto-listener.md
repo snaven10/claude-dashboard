@@ -4,7 +4,7 @@
 - **Especialista:** claude-dashboard-worker (sonnet)
 - **Proyecto:** claude-dashboard (`~/personal/claude-dashboard`), rama de la task desde `main`
 - **Depende de:** — (primera del plan; paralela con TASK-032)
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -66,10 +66,9 @@ y rutas con el local, y cada handler sabe por cuál entró la petición. Existe 
   handler). Revisá que el shutdown espere a los dos.
 
 ## Resultado
-<!-- SE LLENA AL CERRAR -->
-- **Estado final:**
-- **Resumen:**
-- **Archivos tocados:**
-- **Verificado por:**
-- **Desviaciones:**
-- **Riesgos abiertos / siguiente:**
+- **Estado final:** `done`
+- **Resumen:** `-public-url` / `-remote-addr` / `-state-dir` en `main.go` (sin `-public-url` se ignoran y no se crea el dir). `server.Server` gana `RemoteAddr` y `PublicURL`; `ListenAndServe` abre el segundo listener solo si `RemoteAddr != ""` y delega en el nuevo `Serve(ctx, ln, remote)` (un solo poller, un `http.Server` por listener con `BaseContext` que marca el origen; `isRemote(r)`; shutdown paralelo de los dos). Estáticos: `*.webmanifest` → `application/manifest+json`, `/sw.js` → `Cache-Control: no-cache`. `internal/remote`: `ParsePublicURL`, `ValidateRemoteAddr`, `Dir`, `Store` (Read/Write con mutex; `readJSON`/`writeJSON` atómicos 0600, chmod correctivo al leer).
+- **Archivos tocados:** `internal/remote/{config,config_test,store,store_test}.go` (nuevos), `cmd/claude-dashboard/main.go`, `internal/server/server.go`, `internal/server/server_test.go`. Commit código: `c633523`.
+- **Verificado por:** en el worktree, `gofmt -l .` vacío; `go vet ./...` sin salida; `go test -race ./...` todo `ok` (agents, history, orq, plans, remote, server, transcript); `grep -c require go.mod` = 0. Cubren los criterios: `TestParsePublicURL`, `TestValidateRemoteAddr`, `TestWriteJSONModes`, `TestReadFixesLoosePermsAndMissingIsZero`, `TestConcurrentWritesNoCorruption`, `TestIsRemoteByListenerAndSameSnapshot`, `TestSingleListenerWithoutRemoteAddr`, `TestListenAndServeRemoteAddr`, `TestStaticPWAHeaders`. Tests previos de `server_test.go` sin cambios.
+- **Desviaciones:** (1) `Serve(ctx, ln, remote)` es API nueva (no listada en la task) para poder testear con listeners efímeros. (2) `main.go` rechaza además `-remote-addr == -addr` y `-public-url` con credenciales. (3) El commit va sin la línea `Claude-Session` que sugería el harness: la regla del usuario (cero atribución de AI) y su hook la bloquean.
+- **Riesgos abiertos / siguiente:** `main.go` solo valida y crea el dir de estado; el `Store` todavía no lo consume nadie (TASK-031/033). `isRemote` existe pero ningún handler lo usa aún: el gate por cookie es TASK-031. `PublicURL` no se usa todavía en el server.
