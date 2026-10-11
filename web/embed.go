@@ -3,7 +3,8 @@ package web
 
 import "embed"
 
-// FS contiene index.html, app.js, app.css, los fixtures y vendor/qrcode.js (app.test.js no).
+// FS contiene index.html, app.js, app.css, los fixtures (fixture.json, fixture-lista.json,
+// fixture-timeline.json, fixture-history.json) y vendor/qrcode.js (app.test.js no).
 //
-//go:embed index.html app.js app.css fixture.json fixture-timeline.json fixture-history.json vendor/qrcode.js
+//go:embed index.html app.js app.css fixture.json fixture-lista.json fixture-timeline.json fixture-history.json vendor/qrcode.js
 var FS embed.FS
