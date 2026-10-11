@@ -30,6 +30,10 @@ desuscribirse. Sin `-public-url` el notificador no existe.
   (rutas `/api/push/*`, campo `Notifier`), `internal/server/remote.go` (revocar → `RemoveDevice`),
   `cmd/claude-dashboard/main.go` (flags `-push-content`, `-push-cooldown`, cableado)
 
+> **Nota de la revisión de TASK-033 (2026-10-11):** el `webpush.Sender` de producción tiene que usar su
+> cliente por defecto (guard SSRF: sin redirecciones, solo IPs públicas al conectar, sin proxy de entorno).
+> **No inyectes un `http.Client` propio** en el cableado del daemon: uno inyectado se saltea el guard de IP.
+
 ## Pasos
 - [ ] **Paso 1 — `notify.go`.** `Notifier{Now, Cooldown, Content, Enqueue func(payload []byte, topic string)}`
   con `Observe(sessions []agents.Session)`: estado por `sessionId` (último status, ciclos seguidos
