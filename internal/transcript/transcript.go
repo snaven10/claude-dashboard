@@ -54,6 +54,9 @@ type Detail struct {
 	// PLAN-008 (DD-35)
 	Away          *Away `json:"away"`          // resumen "mientras no estabas"; nil si no aplica
 	TurnStartedAt int64 `json:"turnStartedAt"` // ms del último prompt real; 0 si no hay
+	// Found: Summary encontró el archivo del transcript. Solo diagnóstico
+	// (PLAN-010 TASK-023); no entra en ningún JSON.
+	Found bool `json:"-"`
 }
 
 // Away es el resumen que Claude escribe al volver el usuario.
@@ -160,6 +163,7 @@ func Summary(cwd, sessionID string) (Detail, error) {
 		}
 		return Detail{}, fmt.Errorf("leyendo %s: %w", path, err)
 	}
+	d.Found = true // el archivo existe; solo entra al cache el caso encontrado
 
 	mu.Lock()
 	cache[path] = cacheEntry{key: key, detail: d}

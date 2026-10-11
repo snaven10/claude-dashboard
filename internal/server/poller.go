@@ -46,10 +46,13 @@ func (s *Server) build(ctx context.Context) ([]agents.Session, error) {
 	}
 	sem := make(chan struct{}, summaryConcurrency)
 	var wg sync.WaitGroup
+	// detailState[i]: 0 sin resumen (no hay Summary o falló), 1 transcript
+	// encontrado, 2 sin transcript. Cada goroutine escribe solo su índice.
+	detailState := make([]int8, len(sessions))
 	for i := range sessions {
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(ss *agents.Session) {
+		go func(i int, ss *agents.Session) {
 			defer wg.Done()
 			defer func() { <-sem }()
 			if s.Summary != nil {
@@ -57,6 +60,10 @@ func (s *Server) build(ctx context.Context) ([]agents.Session, error) {
 					s.logf("transcript %s: %v", ss.SessionID, err)
 				} else {
 					applyDetail(ss, d)
+					detailState[i] = 2
+					if d.Found {
+						detailState[i] = 1
+					}
 				}
 			}
 			// Tokens independientes del resumen: un fallo de uno no apaga el otro.
@@ -94,13 +101,56 @@ func (s *Server) build(ctx context.Context) ([]agents.Session, error) {
 					applyExtras(ss, e)
 				}
 			}
-		}(&sessions[i])
+		}(i, &sessions[i])
 	}
 	wg.Wait()
 	for i := range sessions {
 		s.enrich(&sessions[i], jobs, now)
 	}
+	s.logWaitingWithoutAsk(sessions, detailState)
 	return sessions, nil
+}
+
+// logWaitingWithoutAsk deja en el log por qué una sesión que espera no trae
+// `ask` (PLAN-010, §2.1): "sin-transcript" o "sin-texto-en-turno". Una sola vez
+// por cambio de motivo; se olvida la sesión cuando deja de esperar o desaparece.
+// La línea solo lleva el id corto, waitingFor de F1 y el motivo: nada del usuario.
+func (s *Server) logWaitingWithoutAsk(sessions []agents.Session, state []int8) {
+	current := map[string]string{}
+	for i := range sessions {
+		ss := &sessions[i]
+		if state[i] == 0 || ss.Ask != nil ||
+			(ss.Status != agents.StatusWaiting && ss.Status != agents.StatusBlocked) {
+			continue
+		}
+		reason := "sin-texto-en-turno"
+		if state[i] == 2 {
+			reason = "sin-transcript"
+		}
+		key := ss.SessionID
+		if key == "" {
+			key = ss.ID
+		}
+		current[key] = reason
+		s.waitMu.Lock()
+		prev, seen := s.waitLog[key]
+		s.waitMu.Unlock()
+		if seen && prev == reason {
+			continue
+		}
+		short := key
+		if len(short) > 8 {
+			short = short[:8]
+		}
+		wf := "-"
+		if ss.WaitingFor != nil && *ss.WaitingFor != "" {
+			wf = *ss.WaitingFor
+		}
+		s.logf("waiting sin ask: %s waitingFor=%s motivo=%s", short, wf, reason)
+	}
+	s.waitMu.Lock()
+	s.waitLog = current
+	s.waitMu.Unlock()
 }
 
 func (s *Server) now() time.Time {
