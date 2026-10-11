@@ -4,7 +4,7 @@
 - **Especialista:** claude-dashboard-worker (sonnet)
 - **Proyecto:** claude-dashboard (raíz del repo), rama `feature/plan-10-task-026` desde `main` (con TASK-025 mergeada)
 - **Depende de:** TASK-025
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -71,10 +71,9 @@ master (la regla de identidad está ahí; no la cambies).
   vez (tolerable).
 
 ## Resultado
-<!-- SE LLENA AL CERRAR (estado done/skipped). Vacío mientras esté pending. -->
-- **Estado final:**
-- **Resumen:**
-- **Archivos tocados:**
-- **Verificado por:**
-- **Desviaciones:**
-- **Riesgos abiertos / siguiente:**
+- **Estado final:** done
+- **Resumen:** `rowKey` (conversación + `#pid`) reemplaza a `sessionKey` en filas, bandeja, j/k, selección, timeline, aviso y QR; selección guardada sin `#` se migra a la primera sesión con ese `sessionId` (`resolveSession`). `collapseRepeats(sessions, groupId)` devuelve `[{head, copies}]` (copies = todos los miembros, incluida la head; N = copies.length) con la regla DD-40; `collapseMixed` lo aplica por estado en el modo "agrupar por plan". La fila head lleva chip `×N` (prioridad máxima, cuenta para el tope), las copias no generan fila ni entran en j/k, los contadores siguen contando todas. El detalle suma "Copias (N)" con un botón por miembro (estado, hace cuánto, PID; la actual marcada) y, si se selecciona una copia, la fila head queda resaltada; los miembros entran en la firma del detalle.
+- **Archivos tocados:** `web/app.js`, `web/app.css`, `web/app.test.js`, este TASK. Commit de código: `bdba772`.
+- **Verificado por:** `node --check web/app.js` ok; `node --test web/` 79/79 pass (13 tests nuevos: rowKey, resolveSession, notifyTargets con gemelos, collapseRepeats x8, collapseMixed, rowView ×N); `rg innerHTML web/app.js` vacío; `gofmt -l .` vacío; `go vet ./...` ok; `go test -race ./...` ok. Sobre `fixture-lista.json` (vía node): 43 `rowKey` únicas; idle 8→6 filas (×2, ×2), done 21→19 (×3), busy 7 y abandonadas 4 sin colapsar.
+- **Desviaciones:** `copies` incluye a la head (la task no lo especificaba). Posición de una entrada colapsada = la del primer miembro en el orden de entrada.
+- **Riesgos abiertos / siguiente:** NO verificado en navegador (no se abrió ninguno): render `?fixture=lista`, unicidad de `data-key` en el DOM, no regresión de la medición de filas a 1440×900 y j/k desde una copia quedan para TASK-029. Estilos de `.chip.rep`/`.copy-item` sin revisar visualmente. El `tag` del aviso de Windows cambia de formato (tolerable, ya anotado).

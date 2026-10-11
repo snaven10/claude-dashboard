@@ -89,7 +89,7 @@ para medir 25+ filas → TASK-022 crea un fixture de lista con el escenario real
 | **TASK-023** | Backend: log de diagnóstico cuando una sesión espera sin `ask` (motivo: sin transcript / sin texto en el turno) | claude-dashboard-worker | sonnet | — | `done` |
 | **TASK-024** | Fila de una línea, lista 60 %, encabezado en 2 renglones, timeline alta | claude-dashboard-worker | sonnet | TASK-022 | `done` |
 | **TASK-025** | Grupos por estado con contador; terminadas/abandonadas en el encabezado; la que espera sale de la lista y la bandeja entra en j/k | claude-dashboard-worker | sonnet | TASK-024 | `done` |
-| **TASK-026** | Colapso "×N" de repetidos + clave de fila única + sección "Copias" en el detalle | claude-dashboard-worker | sonnet | TASK-025 | `pending` |
+| **TASK-026** | Colapso "×N" de repetidos + clave de fila única + sección "Copias" en el detalle | claude-dashboard-worker | sonnet | TASK-025 | `done` |
 | **TASK-027** | Motivo real de espera (`waitView`) en bandeja, detalle y avisos | claude-dashboard-worker | sonnet | TASK-026 (mismo archivo; lógicamente solo TASK-025). TASK-023 confirma §2.1 al cerrar | `pending` |
 | **TASK-028** | Íconos: verificar en el navegador del usuario y, si hace falta, SVG inline / caracteres seguros | claude-dashboard-worker | sonnet | TASK-027 | `pending` |
 | **TASK-029** | Smoke end-to-end con capturas y conteo de filas (claro/oscuro, 1440×900 y teléfono) | orquestador | — | TASK-022..TASK-028 | `pending` |
