@@ -68,7 +68,7 @@ const A = require('./app.js');
 test('formatContext: normal, con compactaciones, warn y null', () => {
   assert.strictEqual(A.formatContext({ current: 412000, compactions: 2, warn: false }), 'contexto 412k · compactó 2×');
   assert.strictEqual(A.formatContext({ current: 90000, compactions: 0, warn: false }), 'contexto 90k');
-  assert.strictEqual(A.formatContext({ current: 850000, compactions: 1, warn: true }), '⚠ contexto 850k, cerca de compactar');
+  assert.strictEqual(A.formatContext({ current: 850000, compactions: 1, warn: true }), '⚠\uFE0E contexto 850k, cerca de compactar');
   assert.strictEqual(A.formatContext(null), '');
   assert.strictEqual(A.formatContext(undefined), '');
 });
@@ -218,7 +218,7 @@ test('errorsView: insignia solo con high; sin high solo tooltip', () => {
   assert.strictEqual(A.errorsView(null), null);
   assert.strictEqual(A.errorsView({ count: 0, high: false }), null);
   const hi = A.errorsView({ windowMin: 10, count: 6, high: true });
-  assert.strictEqual(hi.badge, '⚠ 6 errores en 10 min');
+  assert.strictEqual(hi.badge, '⚠\uFE0E 6 errores en 10 min');
   assert.match(hi.title, /6 errores/);
   const lo = A.errorsView({ windowMin: 10, count: 2, high: false });
   assert.strictEqual(lo.badge, '');
@@ -623,7 +623,7 @@ test('rowView: tooltip = away, o ask de idle, o proyecto · rama; ariaLabel con 
   const conAsk = RVIEW.rowView(s('b', 'idle', Object.assign({ ask: { kind: 'text', text: 'Listo, ¿sigo?' } }, base)), { now: RNOW, projectFilter: '' });
   assert.strictEqual(conAsk.tooltip, 'Listo, ¿sigo?');
   const plano = RVIEW.rowView(s('c', 'busy', base), { now: RNOW, projectFilter: '' });
-  assert.strictEqual(plano.tooltip, 'web-app · ⎇ main');
+  assert.strictEqual(plano.tooltip, 'web-app · rama main');
   const esperando = RVIEW.rowView(s('d', 'waiting', base), { now: RNOW, projectFilter: '' });
   assert.strictEqual(esperando.ariaLabel, 'Migración, esperándote, hace 2 min');
   assert.strictEqual(esperando.when, 'hace 2 min');

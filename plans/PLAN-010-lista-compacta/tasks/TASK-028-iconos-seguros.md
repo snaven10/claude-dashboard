@@ -4,7 +4,7 @@
 - **Especialista:** claude-dashboard-worker (sonnet)
 - **Proyecto:** claude-dashboard (raíz del repo), rama `feature/plan-10-task-028` desde `main` (con TASK-027 mergeada)
 - **Depende de:** TASK-027
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -55,9 +55,27 @@ El usuario decidió (2026-10-11) hacerlo sin verificación previa, por robustez.
 
 ## Resultado
 <!-- SE LLENA AL CERRAR (estado done/skipped). Vacío mientras esté pending. -->
-- **Estado final:**
-- **Resumen:**
-- **Archivos tocados:**
+- **Estado final:** done
+- **Resumen:** helper `icon(name)` (SVG vía `createElementNS`, `aria-hidden`, `focusable=false`,
+  `currentColor`, 1em) + `withIcon(node, name, text)` con íconos `history`, `remote`, `tokens`,
+  `phone`, `branch`. Reemplazados `📡 🔢 📱 ⎇` en `app.js`; botón de historial con SVG inline en
+  `index.html`; la píldora de estado pierde el ícono (se eliminó `STATUS_ICON`); `⚠`/`⚡` pasan a
+  variante de texto (`︎`); el tooltip (no DOM) usa "rama X" y el aviso de `--resume` dice "el QR".
+- **Archivos tocados:** `web/app.js`, `web/index.html`, `web/app.css` (`.icon`), `web/app.test.js`.
+  Commit de código: `6476a0b`.
 - **Verificado por:**
-- **Desviaciones:**
-- **Riesgos abiertos / siguiente:**
+  - `rg -n "📊|📡|🔢|📱|⏳|💤|⎇" web/` → vacío; `rg -n innerHTML web/app.js` → vacío.
+  - `node --check web/app.js` ok; `node --test web/` → 82 pass, 0 fail.
+  - `gofmt -l .` vacío; `go vet ./...` ok; `go test -race ./...` ok (todos los paquetes).
+  - Captura Chromium headless 1440×900 con `?fixture=lista`: sin `▯`; los SVG (historial, teléfono,
+    remoto, rama) se ven y toman el color del texto.
+- **Desviaciones:** las líneas citadas en la task estaban desfasadas (otras tasks movieron
+  `app.js`); se trabajó por búsqueda del carácter, no por número de línea. `⚠`/`⚡` quedaron como
+  texto con `︎` (opción permitida por DD-42), no como SVG.
+- **Riesgos abiertos / siguiente:** (1) NO verificado el tema oscuro: `--force-prefers-color-scheme=dark`
+  produjo la misma captura que el claro; los SVG usan `currentColor`, así que heredan el color por
+  construcción, pero falta mirarlo en un navegador real con tema oscuro. (2) No se midió 390×844 ni
+  se probó con lector de pantalla; los íconos son `aria-hidden` y los botones conservan su texto o
+  `aria-label` (el de teléfono en la bandeja mantiene `aria-label="Abrir en el teléfono"`).
+  (3) `⚡` no apareció en la captura (ninguna fila del fixture mostró "ritmo inusual"), así que su
+  render sin `▯` no está comprobado visualmente.

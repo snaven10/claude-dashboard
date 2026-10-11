@@ -255,6 +255,7 @@ button.counter-link b { font-size: 1rem; color: var(--fg); }
 .pill.s-busy { color: var(--busy); background: var(--busy-bg); }
 .pill.s-idle { color: var(--idle); background: var(--idle-bg); }
 .pill.s-done { color: var(--done); background: var(--done-bg); }
+.icon { width: 1em; height: 1em; vertical-align: -0.125em; flex-shrink: 0; }
 .meta { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 0.8rem; color: var(--muted); }
 .meta span { overflow-wrap: anywhere; }
 .branch { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
