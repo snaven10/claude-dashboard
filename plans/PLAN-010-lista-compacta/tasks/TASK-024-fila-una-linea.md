@@ -4,7 +4,7 @@
 - **Especialista:** claude-dashboard-worker (sonnet)
 - **Proyecto:** claude-dashboard (raíz del repo), rama `feature/plan-10-task-024` desde `main` (con TASK-022 mergeada)
 - **Depende de:** TASK-022
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -78,9 +78,26 @@ a 1440×900. Implementa DD-37 del master (leelo entero antes de empezar).
 
 ## Resultado
 <!-- SE LLENA AL CERRAR (estado done/skipped). Vacío mientras esté pending. -->
-- **Estado final:**
-- **Resumen:**
-- **Archivos tocados:**
+- **Estado final:** done
+- **Resumen:** cada sesión es un renglón de 28 px: punto · título (elipsis) · etiqueta de proyecto (solo con filtro "Todos", `max-width: 14ch`) · hasta 2 chips + "+N" · hora. `rowView(s, { now, projectFilter, maxChips })` es lógica pura y exportada (prioridad errores > contexto warn > ritmo > stale > turno ≥ 15 min > PR > subagentes > líneas > permisos; `tooltip`, `ariaLabel` con estado en texto). Se quitó `.row-sub`, el texto de estado y la mini barra de contexto de la fila. `.split` pasó a `3fr 2fr`. Encabezado en dos renglones (título · conexión · contadores · hoy / filtros · botones · ayuda). Bandeja con tarjetas de dos renglones (motivo en una línea con elipsis y texto completo en `title`). Timeline sin tope de 220 px. Teléfono: misma fila, proyecto oculto, chips máx. 1 + "+N" (vía `isPhone()`; el `resize` ya llama a `render`).
+- **Archivos tocados:** `web/app.js`, `web/app.css`, `web/index.html`, `web/app.test.js` (commit `071d1bf` en `feature/plan-10-task-024`).
 - **Verificado por:**
+  - `gofmt -l .` → vacío; `go vet ./...` ok; `go test -race ./...` → todos los paquetes ok.
+  - `node --check web/app.js` ok; `node --test web/` → 61 pass / 0 fail (8 tests nuevos de `rowView`: orden y tope, "+N", teléfono, proyecto oculto con filtro, tooltip/ariaLabel, texto hostil intacto, estado desconocido, recorrido del fixture de lista); `rg -n innerHTML web/app.js` → vacío.
+  - Medición estándar (Chromium headless, `web/` en 127.0.0.1:8799, iframe del tamaño del viewport, `?fixture=lista`, `localStorage` limpio):
+
+    | Viewport / tema | Línea base TASK-022 | Ahora |
+    |---|---|---|
+    | 1440×900 claro | 12 de 24 visibles, fila 48 px | **24 de 24** (3 tarjetas + 21 filas), fila **28 px** (`rowHmax` 28), 11 eventos de timeline visibles de 20, encabezado 91 px en 2 renglones, `scrollWidth` 1425 ≤ 1440 |
+    | 1440×900 oscuro (`--force-dark-mode`, `matchMedia` dark = true) | no medido | 24 visibles, 11 eventos, sin scroll horizontal |
+    | 390×844 | 6 de 24, `scrollWidth` 375 | **14**, fila 28 px, `scrollWidth` 375 ≤ 390 |
+  - Lista 827 px / detalle 552 px (≈60/40).
 - **Desviaciones:**
+  - Timeline: además de sacar el tope de 220 px, el texto del evento comparte renglón con hora y tipo y `.ev-text` pasó de `max-height: 8em` a `4.2em` (con scroll interno). Sin eso solo se veían 8 eventos; con eso, 11. El detalle arranca en y≈204 con la bandeja visible, por eso no alcanza solo con sacar el tope.
+  - "Alto de fila ≤ 28": se fijó `height: 28px` en `.row` (determinista aunque haya texto largo).
+  - En escritorio los renglones del encabezado van en `nowrap` y la ayuda de teclado se recorta con elipsis antes de bajar a un tercer renglón; el buscador pasó de 14rem a 11rem.
+  - Tarjetas de bandeja: ~65 px de alto (dos renglones), no se pudo bajar más sin tocar los botones.
 - **Riesgos abiertos / siguiente:**
+  - Capturas PNG no tomadas. j/k, Enter, 1/2/3, `/`, Esc **no probados a mano** en navegador; el código de teclado no se tocó (`.row` y `data-key` intactos). Texto hostil: cubierto por test de `rowView` y porque todo se pinta con `textContent`; no se vio en el navegador con alerta.
+  - Con filtro de proyecto activo la etiqueta se oculta; los repetidos "×N" y los grupos por estado siguen para TASK-025/026.
+  - El motivo de la bandeja sigue siendo `waitingFor` crudo hasta TASK-027.
