@@ -683,9 +683,74 @@
     };
   }
 
+  // ---- PLAN-011: teléfono (DD-55) ----
+
+  // Modo de la UI según GET /api/remote. null/enabled:false = como siempre (sin remoto).
+  //   'local-off' | 'local-remote' (escritorio con remoto activo) | 'pair' (remoto sin cookie) | 'paired'
+  function uiMode(r) {
+    if (!r || r.enabled !== true) return 'local-off';
+    if (r.local === true) return 'local-remote';
+    return r.paired === true ? 'paired' : 'pair';
+  }
+
+  // El token viaja en el fragmento: '#pair=<b64url>'. Cualquier otro hash → ''.
+  var PAIR_HASH_RE = /^#pair=([A-Za-z0-9_-]{1,128})$/;
+  function pairTokenFromHash(hash) {
+    var m = PAIR_HASH_RE.exec(typeof hash === 'string' ? hash : '');
+    return m ? m[1] : '';
+  }
+
+  // 'abcd efgh' / 'ABCD-EFGH' → 'ABCDEFGH'. El server también normaliza (O→0, I/L→1).
+  function normalizeCode(s) {
+    return String(s == null ? '' : s).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
+
+  // 'ABCDEFGH' → 'ABCD-EFGH' para mostrar.
+  function formatCode(s) {
+    var n = normalizeCode(s);
+    return n.length === 8 ? n.slice(0, 4) + '-' + n.slice(4) : n;
+  }
+
+  // base64url (sin padding) → Uint8Array. Entrada inválida: lanza (quien llama la captura).
+  function b64urlToBytes(s) {
+    var b = String(s).replace(/-/g, '+').replace(/_/g, '/');
+    while (b.length % 4) b += '=';
+    var bin = atob(b);
+    var out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+
+  // iOS solo entrega push a la PWA instalada: fuera de standalone hay que instalar primero.
+  // iPadOS reciente se presenta como Macintosh; se distingue por la pantalla táctil.
+  function isIOSNeedsInstall(ua, standalone, touchPoints) {
+    var s = typeof ua === 'string' ? ua : '';
+    var ios = /iPhone|iPad|iPod/.test(s) || (/Macintosh/.test(s) && typeof touchPoints === 'number' && touchPoints > 1);
+    return ios && !standalone;
+  }
+
+  // '?s=<id>' del aviso push. Mismo conjunto de caracteres que el server (pushURLIDRe).
+  var SESSION_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+  function deepLinkSession(search) {
+    var v = new URLSearchParams(typeof search === 'string' ? search : '').get('s');
+    return v !== null && SESSION_ID_RE.test(v) ? v : '';
+  }
+
+  // Cuenta regresiva del emparejamiento: { expired, text: 'm:ss' }.
+  function pairCountdown(expiresAt, now) {
+    var rest = typeof expiresAt === 'number' ? expiresAt - now : 0;
+    if (!(rest > 0)) return { expired: true, text: '0:00' };
+    var secs = Math.ceil(rest / 1000);
+    var sec = secs % 60;
+    return { expired: false, text: Math.floor(secs / 60) + ':' + (sec < 10 ? '0' : '') + sec };
+  }
+
   if (typeof document === 'undefined') {
     if (typeof module !== 'undefined' && module.exports) {
       module.exports = {
+        uiMode: uiMode, pairTokenFromHash: pairTokenFromHash, normalizeCode: normalizeCode, formatCode: formatCode,
+        b64urlToBytes: b64urlToBytes, isIOSNeedsInstall: isIOSNeedsInstall, deepLinkSession: deepLinkSession,
+        pairCountdown: pairCountdown,
         validPrUrl: validPrUrl, validArtifactUrl: validArtifactUrl, validPrs: validPrs, validArtifacts: validArtifacts,
         turnMinutes: turnMinutes, awayLine: awayLine, sessionChips: sessionChips,
         rowView: rowView, agoFrom: agoFrom,
@@ -785,6 +850,7 @@
     tokens: [['path', { d: 'M6.2 2.5 4.8 13.5M11.4 2.5 10 13.5M3 6h10.5M2.5 10H13' }]],
     phone: [['rect', { x: '4.5', y: '1.5', width: '7', height: '13', rx: '1.5' }],
       ['path', { d: 'M7 12.5h2' }]],
+    bell: [['path', { d: 'M4 11V7a4 4 0 0 1 8 0v4l1 1.5H3zM6.5 14a1.5 1.5 0 0 0 3 0' }]],
     branch: [['circle', { cx: '5', cy: '3.5', r: '1.5' }], ['circle', { cx: '5', cy: '12.5', r: '1.5' }],
       ['circle', { cx: '11', cy: '5', r: '1.5' }], ['path', { d: 'M5 5v6M11 6.5c0 3-6 2-6 4.5' }]]
   };
@@ -1059,7 +1125,7 @@
 
   function loadHistory() {
     var url = FIXTURE ? 'fixture-history.json' : '/api/history';
-    fetch(url)
+    apiFetch(url)
       .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
       .then(function (d) { if ($('history').hidden) return; historyData = d; renderHistory(d); })
       .catch(function () {
@@ -1084,10 +1150,18 @@
     var now = nowMs();
     // DD-30: las abandonadas no avisan
     fireNotifications(notifyTargets(prevSessions, next).filter(function (s) { return !isAbandoned(s, now); }));
+    var first = prevSessions === null;
     prevSessions = next;
     sessions = next;
     updateProjects();
     render();
+    // Deep link del aviso push (?s=<id>): se consume en el primer snapshot, exista o no la sesión.
+    if (first && pendingDeepLink) {
+      var target = resolveSession(next, pendingDeepLink);
+      pendingDeepLink = '';
+      stripDeepLink();
+      if (target) select(rowKey(target), true);
+    }
   }
 
   function setConn(on) {
@@ -1097,7 +1171,11 @@
   }
 
   function connect() {
+    // Sin SSE mientras no esté emparejado, y nunca dos conexiones a la vez.
+    if (remoteMode === 'pair') return;
+    if (evSrc && evSrc.readyState !== EventSource.CLOSED) return;
     var es = new EventSource('/api/events');
+    evSrc = es;
     es.onopen = function () { setConn(true); };
     es.addEventListener('snapshot', function (e) {
       try { setSnapshot(JSON.parse(e.data)); setConn(true); } catch (err) { /* evento inválido: ignorar */ }
@@ -1107,6 +1185,17 @@
       // EventSource reintenta solo salvo que el estado sea CLOSED.
       if (es.readyState === EventSource.CLOSED) {
         es.close();
+        if (remoteMode === 'paired') {
+          // El SSE no expone el status: se pregunta si la cookie sigue valiendo (¿revocada?).
+          fetch('/api/remote')
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .catch(function () { return null; })
+            .then(function (info) {
+              if (info && uiMode(info) === 'pair') toUnpaired();
+              else setTimeout(connect, 3000);
+            });
+          return;
+        }
         setTimeout(connect, 3000);
       }
     };
@@ -1465,7 +1554,7 @@
   }
 
   function loadToday() {
-    fetch(FIXTURE ? 'fixture-history.json' : '/api/history')
+    apiFetch(FIXTURE ? 'fixture-history.json' : '/api/history')
       .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
       .then(function (d) { historyToday = todayView(d); renderToday(); })
       .catch(function () { /* sin historial: el resumen queda oculto */ });
@@ -1490,7 +1579,7 @@
     t.version++;
     var req = ++t.req;
     var url = FIXTURE ? 'fixture-timeline.json' : '/api/sessions/' + encodeURIComponent(s.sessionId) + '/timeline';
-    fetch(url)
+    apiFetch(url)
       .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
       .then(function (d) {
         if (req !== t.req) return;
@@ -1845,6 +1934,7 @@
     var tag = ae && ae.tagName;
     var typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
     if (ev.key === 'Escape') {
+      if (phoneOpen()) { closePhone(); return; }
       if (!$('history').hidden) { closeHistory(); return; }
       if (search.value || ae === search) {
         if (search.value) { search.value = ''; query = ''; render(); }
@@ -1856,7 +1946,7 @@
       if (phoneDetail) { phoneDetail = false; render(); window.scrollTo(0, 0); }
       return;
     }
-    if (typing || !$('history').hidden) return;
+    if (typing || !$('history').hidden || phoneOpen()) return;
     var k = ev.key;
     if (k === 'j' || k === 'ArrowDown' || k === 'k' || k === 'ArrowUp') {
       var next = stepSelection(navKeys, visibleKeyOf(selectedKey), k === 'j' || k === 'ArrowDown' ? 1 : -1);
@@ -1875,6 +1965,563 @@
       saveFilters();
       render();
     }
+  }
+
+  // ---- PLAN-011: teléfono (DD-55) ----
+  // Todo el DOM de este bloque se crea desde acá y solo con el modo remoto activo: sin él, la
+  // página es la de siempre. Texto del server y del usuario: siempre textContent.
+
+  var remoteMode = 'local-off'; // uiMode() de GET /api/remote
+  var evSrc = null;
+  var started = false;
+  var todayTimer = null;
+  var pendingDeepLink = deepLinkSession(location.search);
+  var phoneState = { timer: null, pair: null, devices: null, err: '', req: 0 };
+  var pushFailed = false;
+
+  // Fetch a la API: un 401 con la PWA emparejada = cookie revocada o vencida (paso 6).
+  function apiFetch(url, opts) {
+    return fetch(url, opts).then(function (r) {
+      if (r.status === 401 && remoteMode === 'paired') {
+        toUnpaired();
+        throw new Error('unpaired');
+      }
+      return r;
+    });
+  }
+
+  function jsonInit(method, body) {
+    var o = { method: method, headers: { 'Content-Type': 'application/json' } };
+    if (body !== undefined) o.body = JSON.stringify(body);
+    return o;
+  }
+
+  // POST/DELETE JSON (DD-48 exige Content-Type JSON). Devuelve el JSON, o null si 204.
+  function sendJSON(method, url, body) {
+    return apiFetch(url, jsonInit(method, body)).then(function (r) {
+      if (!r.ok) throw new Error('http ' + r.status);
+      return r.status === 204 ? null : r.json();
+    });
+  }
+
+  function stripDeepLink() {
+    try {
+      var u = new URL(location.href);
+      u.searchParams.delete('s');
+      history.replaceState(null, '', u.pathname + u.search + u.hash);
+    } catch (e) { /* ignorar */ }
+  }
+
+  // Con ?fixture: ?remote=off|pair|paired; por defecto, escritorio con remoto activo.
+  function fixtureRemoteMode() {
+    var v = new URLSearchParams(location.search).get('remote');
+    if (v === 'off') return 'local-off';
+    if (v === 'pair' || v === 'paired') return v;
+    return 'local-remote';
+  }
+
+  function fakePair() {
+    return {
+      url: 'https://mi-pc.tailnet-ejemplo.ts.net/#pair=fixtureTokenFixtureTokenFixtureTokenAB1',
+      code: 'K7QM-3XR9',
+      expiresAt: Date.now() + 5 * 60000
+    };
+  }
+
+  function fakeDevices() {
+    var n = Date.now();
+    return [
+      { id: 'fx-1', name: 'iPhone', login: '', createdAt: n - 3 * 86400000, lastSeenAt: n - 2 * 60000 },
+      { id: 'fx-2', name: 'Android de prueba', login: '', createdAt: n - 40 * 86400000, lastSeenAt: n - 5 * 3600000 }
+    ];
+  }
+
+  // -- Pantalla de emparejar (remoto sin cookie) --
+
+  function pairScreen() {
+    var ov = $('pair-screen');
+    if (ov) return ov;
+    ov = el('div', 'overlay pair-overlay');
+    ov.id = 'pair-screen';
+    var panel = el('div', 'panel');
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-labelledby', 'pair-title');
+    var head = el('div', 'panel-head');
+    var h = el('h2', null, 'Emparejar este dispositivo');
+    h.id = 'pair-title';
+    head.appendChild(h);
+    var body = el('div', 'panel-body');
+    body.appendChild(el('p', 'help', 'Escaneá el QR del panel de tu PC con la cámara, o escribí el código que aparece debajo del QR.'));
+    var msg = el('p', 'pair-msg');
+    msg.id = 'pair-msg';
+    msg.setAttribute('role', 'status');
+    msg.setAttribute('aria-live', 'polite');
+    body.appendChild(msg);
+
+    var form = el('form', 'pair-form');
+    form.id = 'pair-form';
+    var l1 = el('label', null, 'Código');
+    var code = el('input');
+    code.type = 'text';
+    code.id = 'pair-code';
+    code.placeholder = 'ABCD-EFGH';
+    code.maxLength = 12;
+    code.autocomplete = 'off';
+    code.spellcheck = false;
+    code.setAttribute('autocapitalize', 'characters');
+    code.setAttribute('autocorrect', 'off');
+    l1.appendChild(code);
+    var l2 = el('label', null, 'Nombre del dispositivo (opcional)');
+    var name = el('input');
+    name.type = 'text';
+    name.id = 'pair-name';
+    name.maxLength = 40;
+    name.autocomplete = 'off';
+    l2.appendChild(name);
+    var go = btn('emparejar');
+    go.type = 'submit';
+    go.id = 'pair-go';
+    form.appendChild(l1);
+    form.appendChild(l2);
+    form.appendChild(go);
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var c = normalizeCode(code.value);
+      if (c.length !== 8) { msg.textContent = 'El código tiene 8 caracteres (ABCD-EFGH).'; return; }
+      redeemPair({ code: c, name: name.value.trim() });
+    });
+    body.appendChild(form);
+    panel.appendChild(head);
+    panel.appendChild(body);
+    ov.appendChild(panel);
+    document.body.appendChild(ov);
+    return ov;
+  }
+
+  function pairMsg(text) { $('pair-msg').textContent = text; }
+
+  function setPairBusy(on) {
+    $('pair-go').disabled = on;
+    $('pair-code').disabled = on;
+    $('pair-name').disabled = on;
+  }
+
+  function redeemPair(payload) {
+    setPairBusy(true);
+    pairMsg('Emparejando…');
+    fetch('/api/pair/redeem', jsonInit('POST', payload))
+      .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+      .then(function () {
+        pairMsg('');
+        setPairBusy(false);
+        $('pair-code').value = '';
+        pairScreen().hidden = true;
+        boot(); // recarga el estado y sigue como emparejado
+      })
+      .catch(function () {
+        setPairBusy(false);
+        pairMsg('No se pudo emparejar: el código venció o no es válido. Generá uno nuevo con "conectar teléfono" en el panel de tu PC.');
+        $('pair-code').focus();
+      });
+  }
+
+  function showPairScreen() {
+    var ov = pairScreen();
+    ov.hidden = false;
+    document.body.classList.add('pairing');
+    // #pair=<token>: canje automático. El fragmento se borra ANTES de enviar: no queda en la barra.
+    var token = pairTokenFromHash(location.hash);
+    if (token && !FIXTURE) {
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignorar */ }
+      redeemPair({ token: token, name: $('pair-name').value.trim() });
+      return;
+    }
+    pairMsg('');
+    $('pair-code').focus();
+  }
+
+  function toUnpaired() {
+    if (remoteMode === 'pair') return;
+    remoteMode = 'pair';
+    started = false;
+    if (evSrc) { evSrc.close(); evSrc = null; }
+    setConn(false);
+    applyMode();
+    showPairScreen();
+    pairMsg('Este dispositivo ya no está emparejado. Escaneá un QR nuevo o escribí el código.');
+  }
+
+  // -- Panel "conectar teléfono" (escritorio con remoto activo) --
+
+  function phoneOpen() {
+    var p = $('phone-panel');
+    return !!p && !p.hidden;
+  }
+
+  function closePhone() {
+    var p = $('phone-panel');
+    if (!p || p.hidden) return;
+    p.hidden = true;
+    if (phoneState.timer) { clearInterval(phoneState.timer); phoneState.timer = null; }
+    phoneState.req++; // respuestas en vuelo: se descartan
+    if (lastFocus && lastFocus.isConnected) lastFocus.focus();
+    lastFocus = null;
+  }
+
+  function buildPhonePanel() {
+    var ov = el('div', 'overlay');
+    ov.id = 'phone-panel';
+    ov.hidden = true;
+    var panel = el('div', 'panel');
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-labelledby', 'phone-title');
+    var head = el('div', 'panel-head');
+    var h = el('h2', null, 'Conectar teléfono');
+    h.id = 'phone-title';
+    var close = btn('✕');
+    close.id = 'phone-close';
+    close.setAttribute('aria-label', 'Cerrar (Esc)');
+    close.addEventListener('click', closePhone);
+    head.appendChild(h);
+    head.appendChild(close);
+    var body = el('div', 'panel-body');
+    body.id = 'phone-body';
+    panel.appendChild(head);
+    panel.appendChild(body);
+    ov.appendChild(panel);
+    ov.addEventListener('click', function (ev) { if (ev.target === ov) closePhone(); });
+    document.body.appendChild(ov);
+    return ov;
+  }
+
+  function renderPhone() {
+    var body = $('phone-body');
+    if (!body) return;
+    var st = phoneState;
+    var nodes = [];
+
+    var box = el('div', 'qr-box');
+    var cd = st.pair ? pairCountdown(st.pair.expiresAt, Date.now()) : null;
+    if (st.err) {
+      nodes.push(el('p', 'empty', st.err));
+    } else if (!st.pair) {
+      nodes.push(el('p', 'empty', 'Generando código…'));
+    } else {
+      var rows = [];
+      try { rows = qrMatrix(st.pair.url); } catch (e) { rows = []; }
+      if (rows.length) {
+        var canvas = el('canvas', 'qr' + (cd.expired ? ' expired' : ''));
+        canvas.setAttribute('role', 'img');
+        canvas.setAttribute('aria-label', 'Código QR para emparejar el teléfono');
+        drawQr(canvas, rows);
+        box.appendChild(canvas);
+      }
+      var side = el('div', 'qr-side');
+      side.appendChild(el('p', 'help', rows.length
+        ? 'Escaneá el QR con la cámara del teléfono, o escribí este código en la pantalla de emparejar:'
+        : 'No se pudo generar el QR; escribí este código en la pantalla de emparejar:'));
+      var code = el('div', 'pair-code', formatCode(st.pair.code));
+      code.setAttribute('aria-label', 'Código ' + formatCode(st.pair.code).split('').join(' '));
+      side.appendChild(code);
+      var count = el('p', 'pair-count', cd.expired ? 'venció — generar otro' : 'vence en ' + cd.text);
+      count.id = 'pair-count';
+      side.appendChild(count);
+      var row = el('div', 'pair-actions');
+      var again = btn(cd.expired ? 'generar otro' : 'generar otro código');
+      again.addEventListener('click', newPairing);
+      row.appendChild(again);
+      var cp = btn('copiar link');
+      cp.addEventListener('click', function () { copyText(st.pair.url, cp); });
+      row.appendChild(cp);
+      side.appendChild(row);
+      box.appendChild(side);
+      nodes.push(box);
+    }
+    if (st.err) {
+      var retry = btn('reintentar');
+      retry.addEventListener('click', newPairing);
+      nodes.push(retry);
+    }
+
+    var steps = el('ol', 'pair-steps');
+    ['Escaneá el QR con la cámara del teléfono (el teléfono tiene que estar en tu tailnet).',
+      'Abrí el link que te propone.',
+      'Agregá el panel a la pantalla de inicio (Compartir → Agregar a inicio).',
+      'Abrí la app desde ahí y activá los avisos. Si te pide un código, escribí el de arriba.'
+    ].forEach(function (t) { steps.appendChild(el('li', null, t)); });
+    nodes.push(steps);
+
+    var dh = el('h3', 'dev-h', 'Dispositivos emparejados' + (st.devices ? ' (' + st.devices.length + ')' : ''));
+    nodes.push(dh);
+    if (st.devices === null) {
+      nodes.push(el('p', 'empty', 'Cargando…'));
+    } else if (!st.devices.length) {
+      nodes.push(el('p', 'empty', 'Ningún dispositivo emparejado todavía.'));
+    } else {
+      var ul = el('ul', 'dev-list');
+      var now = Date.now();
+      st.devices.forEach(function (d) {
+        var li = el('li', 'dev-item');
+        var info = el('div', 'dev-info');
+        info.appendChild(el('strong', null, String(d.name || 'dispositivo')));
+        info.appendChild(el('span', 'help', 'alta ' + agoFrom(d.createdAt, now) + ' · último uso ' + agoFrom(d.lastSeenAt, now)));
+        li.appendChild(info);
+        var rv = btn('revocar');
+        rv.setAttribute('aria-label', 'Revocar ' + String(d.name || 'dispositivo'));
+        rv.addEventListener('click', function () { revokeDevice(d); });
+        li.appendChild(rv);
+        ul.appendChild(li);
+      });
+      nodes.push(ul);
+    }
+    body.replaceChildren.apply(body, nodes);
+  }
+
+  function tickPhone() {
+    var st = phoneState;
+    if (!st.pair || !phoneOpen()) return;
+    var cd = pairCountdown(st.pair.expiresAt, Date.now());
+    var c = $('pair-count');
+    if (cd.expired) {
+      if (!c || c.textContent !== 'venció — generar otro') renderPhone();
+    } else if (c) {
+      c.textContent = 'vence en ' + cd.text;
+    }
+  }
+
+  function newPairing() {
+    var st = phoneState;
+    var req = ++st.req;
+    st.pair = null;
+    st.err = '';
+    renderPhone();
+    var p = FIXTURE ? Promise.resolve(fakePair()) : sendJSON('POST', '/api/pair/new', {});
+    p.then(function (d) {
+      if (req !== st.req || !phoneOpen()) return;
+      if (!d || typeof d.url !== 'string' || typeof d.code !== 'string' || typeof d.expiresAt !== 'number') throw new Error('respuesta inválida');
+      st.pair = d;
+      renderPhone();
+    }).catch(function () {
+      if (req !== st.req || !phoneOpen()) return;
+      st.err = 'No se pudo generar el código de emparejamiento.';
+      renderPhone();
+    });
+  }
+
+  function loadDevices() {
+    var st = phoneState;
+    var req = st.req;
+    var p = FIXTURE ? Promise.resolve({ devices: fakeDevices() }) : apiFetch('/api/devices').then(function (r) {
+      if (!r.ok) throw new Error('http ' + r.status);
+      return r.json();
+    });
+    p.then(function (d) {
+      if (req !== st.req || !phoneOpen()) return;
+      st.devices = d && Array.isArray(d.devices) ? d.devices : [];
+      renderPhone();
+    }).catch(function () {
+      if (req !== st.req || !phoneOpen()) return;
+      st.devices = [];
+      renderPhone();
+    });
+  }
+
+  function revokeDevice(d) {
+    var nm = String(d.name || 'dispositivo');
+    if (!window.confirm('Este teléfono deja de ver el panel.\n¿Revocar «' + nm + '»?')) return;
+    var st = phoneState;
+    if (FIXTURE) {
+      st.devices = (st.devices || []).filter(function (x) { return x.id !== d.id; });
+      renderPhone();
+      return;
+    }
+    sendJSON('DELETE', '/api/devices/' + encodeURIComponent(d.id))
+      .catch(function () { /* 404: ya no estaba; se recarga igual */ })
+      .then(function () { loadDevices(); });
+  }
+
+  function openPhone(opener) {
+    lastFocus = opener || document.activeElement;
+    var p = $('phone-panel') || buildPhonePanel();
+    var st = phoneState;
+    st.devices = null;
+    st.pair = null;
+    st.err = '';
+    p.hidden = false;
+    $('phone-close').focus();
+    if (st.timer) clearInterval(st.timer);
+    st.timer = setInterval(tickPhone, 1000);
+    newPairing();
+    loadDevices();
+  }
+
+  function ensurePhoneButton() {
+    if ($('btn-phone')) return;
+    var b = btn('');
+    b.id = 'btn-phone';
+    withIcon(b, 'phone', ' conectar teléfono');
+    b.addEventListener('click', function (ev) { openPhone(ev.currentTarget); });
+    $('btn-history').insertAdjacentElement('afterend', b);
+  }
+
+  // -- Avisos push en el teléfono (remoto emparejado) --
+
+  function isStandalone() {
+    return window.navigator.standalone === true ||
+      (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches);
+  }
+
+  function pushSupported() {
+    return 'serviceWorker' in navigator && 'PushManager' in window && typeof Notification !== 'undefined' &&
+      window.isSecureContext === true;
+  }
+
+  function registerSW() {
+    if (FIXTURE || !('serviceWorker' in navigator) || !window.isSecureContext) return;
+    navigator.serviceWorker.register('/sw.js').catch(function () { /* sin SW no hay push; el panel sigue */ });
+  }
+
+  function setPushBtn(b, label, title, disabled, pressed) {
+    b.replaceChildren();
+    withIcon(b, 'bell', ' ' + label);
+    b.title = title;
+    b.disabled = disabled;
+    b.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+  }
+
+  function refreshPushBtn() {
+    var b = $('btn-push');
+    if (!b) return;
+    if (!pushSupported()) {
+      setPushBtn(b, 'avisos no soportados', 'Este navegador no soporta avisos push', true, false);
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      setPushBtn(b, 'avisos bloqueados', 'El navegador bloqueó las notificaciones para este sitio', true, false);
+      return;
+    }
+    var off = pushFailed ? 'no se pudo activar — reintentar' : 'avisos en este teléfono';
+    setPushBtn(b, off, 'Recibir un aviso cuando una sesión te espera, aunque la app esté cerrada', false, false);
+    navigator.serviceWorker.ready
+      .then(function (reg) { return reg.pushManager.getSubscription(); })
+      .then(function (sub) {
+        if (sub && Notification.permission === 'granted') {
+          setPushBtn(b, 'avisos en este teléfono: activados', 'Tocá para desactivar', false, true);
+        }
+      })
+      .catch(function () { /* queda como estaba */ });
+  }
+
+  function subscribePush(reg, key) {
+    var opts = { userVisibleOnly: true, applicationServerKey: key };
+    return reg.pushManager.subscribe(opts).catch(function (err) {
+      // Clave VAPID distinta de la suscripción vieja: se descarta la vieja y se reintenta una vez.
+      if (!err || err.name !== 'InvalidStateError') throw err;
+      return reg.pushManager.getSubscription()
+        .then(function (old) { return old ? old.unsubscribe() : null; })
+        .then(function () { return reg.pushManager.subscribe(opts); });
+    });
+  }
+
+  function togglePush() {
+    var b = $('btn-push');
+    if (!b || b.disabled || !pushSupported()) return;
+    var turningOff = b.getAttribute('aria-pressed') === 'true';
+    b.disabled = true;
+    var done = function (failed) {
+      pushFailed = failed;
+      b.disabled = false;
+      refreshPushBtn();
+    };
+    if (turningOff) {
+      navigator.serviceWorker.ready
+        .then(function (reg) { return reg.pushManager.getSubscription(); })
+        .then(function (sub) {
+          if (!sub) return null;
+          return sendJSON('POST', '/api/push/unsubscribe', { endpoint: sub.endpoint })
+            .catch(function () { /* el server limpia 404/410 solo */ })
+            .then(function () { return sub.unsubscribe(); });
+        })
+        .then(function () { done(false); }, function () { done(true); });
+      return;
+    }
+    // El permiso se pide acá, sincrónico dentro del gesto del click (iOS lo exige).
+    var perm = Notification.requestPermission();
+    Promise.resolve(perm).then(function (p) {
+      if (p !== 'granted') throw new Error('permiso ' + p);
+      return Promise.all([
+        navigator.serviceWorker.ready,
+        apiFetch('/api/push/key').then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+      ]);
+    }).then(function (x) {
+      return subscribePush(x[0], b64urlToBytes(x[1].key));
+    }).then(function (sub) {
+      return sendJSON('POST', '/api/push/subscribe', sub.toJSON());
+    }).then(function () { done(false); }, function () {
+      done(Notification.permission !== 'denied');
+    });
+  }
+
+  function ensurePushButton() {
+    if ($('btn-push') || $('push-note')) return;
+    var after = $('btn-notify');
+    if (isIOSNeedsInstall(navigator.userAgent, isStandalone(), navigator.maxTouchPoints)) {
+      var note = el('span', 'push-note',
+        'Agregá el panel a la pantalla de inicio (Compartir → Agregar a inicio) para recibir avisos — requiere iOS 16.4+');
+      note.id = 'push-note';
+      after.insertAdjacentElement('afterend', note);
+      return;
+    }
+    var b = btn('');
+    b.id = 'btn-push';
+    b.addEventListener('click', togglePush);
+    after.insertAdjacentElement('afterend', b);
+    refreshPushBtn();
+  }
+
+  // Deja el DOM según remoteMode; sin remoto no queda nada de lo agregado acá.
+  function applyMode() {
+    document.body.classList.toggle('pairing', remoteMode === 'pair');
+    ['btn-phone', 'btn-push', 'push-note'].forEach(function (id) {
+      var n = $(id);
+      var keep = (id === 'btn-phone' && remoteMode === 'local-remote') ||
+        (id !== 'btn-phone' && remoteMode === 'paired');
+      if (n && !keep) n.remove();
+    });
+    if (remoteMode !== 'pair') { var ps = $('pair-screen'); if (ps) ps.hidden = true; }
+    if (remoteMode === 'local-remote') ensurePhoneButton();
+    if (remoteMode === 'paired') { registerSW(); ensurePushButton(); }
+  }
+
+  function startToday() {
+    loadToday();
+    if (!todayTimer) todayTimer = setInterval(loadToday, 60000);
+  }
+
+  function startPanel() {
+    if (started) return;
+    started = true;
+    startToday();
+    apiFetch('/api/sessions')
+      .then(function (r) { return r.json(); })
+      .then(setSnapshot)
+      .catch(function () { /* el SSE traerá el snapshot */ });
+    connect();
+  }
+
+  // Paso 1: antes de abrir el SSE se pregunta a /api/remote. Si falla o es 404 → como siempre.
+  function boot() {
+    fetch('/api/remote')
+      .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+      .catch(function () { return null; })
+      .then(function (info) {
+        remoteMode = uiMode(info);
+        applyMode();
+        if (remoteMode === 'pair') { showPairScreen(); return; }
+        startPanel();
+      });
   }
 
   function init() {
@@ -1920,10 +2567,12 @@
 
     // refresca los "hace X min" sin esperar un snapshot
     setInterval(render, 30000);
-    loadToday();
-    setInterval(loadToday, 60000);
 
     if (FIXTURE) {
+      remoteMode = fixtureRemoteMode();
+      applyMode();
+      if (remoteMode === 'pair') { showPairScreen(); return; }
+      startToday();
       fetch(FIXTURE_FILE)
         .then(function (r) { return r.json(); })
         .then(function (d) { setSnapshot(d); setConn(true); })
@@ -1931,11 +2580,7 @@
       return;
     }
 
-    fetch('/api/sessions')
-      .then(function (r) { return r.json(); })
-      .then(setSnapshot)
-      .catch(function () { /* el SSE traerá el snapshot */ });
-    connect();
+    boot();
   }
 
   init();
