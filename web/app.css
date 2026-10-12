@@ -116,7 +116,9 @@ kbd {
 .kbd-hint { color: var(--muted); font-size: 0.75rem; }
 /* escritorio: dos renglones fijos; la ayuda de teclado se recorta antes de bajar a un tercero */
 @media (min-width: 761px) {
-  .top-row, .filters { flex-wrap: nowrap; }
+  .top-row { flex-wrap: nowrap; }
+  /* con el botón de teléfono la barra puede no entrar en una línea: baja en vez de desbordar */
+  .filters { flex-wrap: wrap; }
   .filters > * { flex: none; }
   .filters .kbd-hint { flex: 1 1 0; min-width: 0; margin-left: auto; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
@@ -385,3 +387,22 @@ button.counter-link b { font-size: 1rem; color: var(--fg); }
 .copy-st { font-weight: 600; }
 .copy-when, .copy-pid { color: var(--muted); }
 .copy-now { margin-left: auto; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; }
+
+/* ---- teléfono (PLAN-011, DD-55) ---- */
+.pair-code { font-family: var(--mono); font-size: 1.6rem; font-weight: 700; letter-spacing: 0.12em; overflow-wrap: anywhere; }
+.pair-count { margin: 0; font-size: 0.85rem; color: var(--muted); }
+.pair-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.qr.expired { opacity: 0.25; }
+.pair-steps { margin: 12px 0; padding-left: 1.3rem; font-size: 0.85rem; display: grid; gap: 4px; }
+.dev-h { margin: 14px 0 6px; font-size: 0.9rem; }
+.dev-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.dev-item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; }
+.dev-info { display: grid; gap: 2px; min-width: 0; flex: 1 1 12rem; overflow-wrap: anywhere; }
+.pair-overlay { background: var(--bg, var(--card)); }
+.pair-form { display: grid; gap: 10px; margin-top: 8px; }
+.pair-form label { display: grid; gap: 4px; font-size: 0.85rem; }
+.pair-form input { font: inherit; font-size: 1rem; color: var(--fg); background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 8px; min-width: 0; }
+.pair-form button { min-height: 40px; }
+.pair-msg { min-height: 1.2em; font-size: 0.85rem; overflow-wrap: anywhere; }
+.push-note { font-size: 0.8rem; color: var(--muted); max-width: 100%; overflow-wrap: anywhere; }
+body.pairing .top, body.pairing main { display: none; }

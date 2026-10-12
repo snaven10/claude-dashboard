@@ -835,3 +835,88 @@ test('waitView: texto hostil queda como texto y no aparece "input needed"', () =
     { waitingFor: 'input needed', lastAction: { kind: 'text', text: 'hola' } }];
   all.forEach((s) => assert.ok(!A.waitFull(A.waitView(s)).includes('input needed')));
 });
+
+// ---- PLAN-011: teléfono (DD-55) ----
+const phone = require('./app.js');
+
+test('uiMode: los cuatro modos y entradas ajenas', () => {
+  assert.strictEqual(phone.uiMode(null), 'local-off');
+  assert.strictEqual(phone.uiMode(undefined), 'local-off');
+  assert.strictEqual(phone.uiMode({}), 'local-off');
+  assert.strictEqual(phone.uiMode({ enabled: false, local: true, paired: false }), 'local-off');
+  assert.strictEqual(phone.uiMode({ enabled: true, local: true, paired: false }), 'local-remote');
+  assert.strictEqual(phone.uiMode({ enabled: true, local: false, paired: false }), 'pair');
+  assert.strictEqual(phone.uiMode({ enabled: true, local: false, paired: true }), 'paired');
+  // local manda: una cookie en el listener local no cambia el modo
+  assert.strictEqual(phone.uiMode({ enabled: true, local: true, paired: true }), 'local-remote');
+});
+
+test('pairTokenFromHash: solo #pair=<b64url>', () => {
+  assert.strictEqual(phone.pairTokenFromHash('#pair=abc'), 'abc');
+  assert.strictEqual(phone.pairTokenFromHash('#pair=aB3_-9'), 'aB3_-9');
+  assert.strictEqual(phone.pairTokenFromHash(''), '');
+  assert.strictEqual(phone.pairTokenFromHash('#otro=abc'), '');
+  assert.strictEqual(phone.pairTokenFromHash('#pair='), '');
+  assert.strictEqual(phone.pairTokenFromHash('#pair=a&b=c'), '');
+  assert.strictEqual(phone.pairTokenFromHash('#pair=<b>'), '');
+  assert.strictEqual(phone.pairTokenFromHash(null), '');
+});
+
+test('normalizeCode y formatCode', () => {
+  assert.strictEqual(phone.normalizeCode('abcd efgh'), 'ABCDEFGH');
+  assert.strictEqual(phone.normalizeCode('ABCD-EFGH'), 'ABCDEFGH');
+  assert.strictEqual(phone.normalizeCode(' k7qm-3xr9 '), 'K7QM3XR9');
+  assert.strictEqual(phone.normalizeCode(null), '');
+  assert.strictEqual(phone.formatCode('abcdefgh'), 'ABCD-EFGH');
+  assert.strictEqual(phone.formatCode('abc'), 'ABC');
+});
+
+test('b64urlToBytes con vectores conocidos', () => {
+  assert.deepStrictEqual(Array.from(phone.b64urlToBytes('AQID')), [1, 2, 3]);
+  // 04 ff ff fb: usa los dos caracteres propios de base64url ('_' y '-') y necesita padding
+  assert.deepStrictEqual(Array.from(phone.b64urlToBytes('BP__-w')), [0x04, 0xff, 0xff, 0xfb]);
+  assert.deepStrictEqual(Array.from(phone.b64urlToBytes('')), []);
+  assert.strictEqual(phone.b64urlToBytes('AQID') instanceof Uint8Array, true);
+});
+
+test('isIOSNeedsInstall: iOS, Android y escritorio', () => {
+  const iphone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 Version/17.4 Mobile/15E148 Safari/604.1';
+  const android = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36';
+  const desktop = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36';
+  const mac = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.4 Safari/605.1.15';
+  assert.strictEqual(phone.isIOSNeedsInstall(iphone, false), true);
+  assert.strictEqual(phone.isIOSNeedsInstall(iphone, true), false);
+  assert.strictEqual(phone.isIOSNeedsInstall(android, false), false);
+  assert.strictEqual(phone.isIOSNeedsInstall(desktop, false), false);
+  assert.strictEqual(phone.isIOSNeedsInstall(mac, false, 0), false);
+  assert.strictEqual(phone.isIOSNeedsInstall(mac, false, 5), true); // iPadOS como Macintosh
+  assert.strictEqual(phone.isIOSNeedsInstall(undefined, false), false);
+});
+
+test('deepLinkSession: ids válidos sí; traversal y HTML no', () => {
+  assert.strictEqual(phone.deepLinkSession('?s=abc-123_XYZ'), 'abc-123_XYZ');
+  assert.strictEqual(phone.deepLinkSession('?fixture&s=0a1b2c3d-1111-4222-8333-444455556666'), '0a1b2c3d-1111-4222-8333-444455556666');
+  assert.strictEqual(phone.deepLinkSession('?s=../x'), '');
+  assert.strictEqual(phone.deepLinkSession('?s=%2E%2E%2Fx'), '');
+  assert.strictEqual(phone.deepLinkSession('?s=<b>'), '');
+  assert.strictEqual(phone.deepLinkSession('?s=%3Cb%3E'), '');
+  assert.strictEqual(phone.deepLinkSession('?s='), '');
+  assert.strictEqual(phone.deepLinkSession('?s=' + 'a'.repeat(129)), '');
+  assert.strictEqual(phone.deepLinkSession('?x=1'), '');
+  assert.strictEqual(phone.deepLinkSession(''), '');
+});
+
+test('pairCountdown', () => {
+  assert.deepStrictEqual(phone.pairCountdown(1000 + 5 * 60000, 1000), { expired: false, text: '5:00' });
+  assert.deepStrictEqual(phone.pairCountdown(1000 + 61000, 1000), { expired: false, text: '1:01' });
+  assert.deepStrictEqual(phone.pairCountdown(1000 + 9500, 1000), { expired: false, text: '0:10' });
+  assert.deepStrictEqual(phone.pairCountdown(1000, 1000), { expired: true, text: '0:00' });
+  assert.deepStrictEqual(phone.pairCountdown(500, 1000), { expired: true, text: '0:00' });
+  assert.deepStrictEqual(phone.pairCountdown(undefined, 1000), { expired: true, text: '0:00' });
+});
+
+test('app.js sin innerHTML ni generadores HTML de la librería de QR', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, 'app.js'), 'utf8');
+  assert.doesNotMatch(src, /innerHTML/);
+  assert.doesNotMatch(src, /createSvgTag|createImgTag|createTableTag/);
+});
