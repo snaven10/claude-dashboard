@@ -57,6 +57,7 @@ expone el panel.
 | **TASK-036** | Frontend: "conectar teléfono" (QR, código, dispositivos), pantalla de emparejar, botón de avisos push | claude-dashboard-worker | sonnet | TASK-031, TASK-034, TASK-035 · **PLAN-010 cerrado** | `pending` |
 | **TASK-037** | README + docs/API.md + guía Tailscale/WSL + limitaciones iOS/Android | claude-dashboard-worker | sonnet | TASK-034, TASK-036 | `pending` |
 | **TASK-038** | Smoke end-to-end + **gate del usuario con su teléfono real** | orquestador + usuario | — | TASK-037 | `pending` |
+| **TASK-039** | Vista teléfono legible: encabezado compacto, filas de 2 renglones, timeline apilada, un solo botón de avisos (hallazgo del gate de TASK-038) | claude-dashboard-worker | sonnet | TASK-036 | `pending` |
 
 **Modelo de TASK-032 = opus.** Es poco código, pero el vector del RFC solo prueba la derivación
 de claves con entradas fijas: un error que lo pasa igual — reusar `salt` o la clave efímera entre
