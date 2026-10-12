@@ -644,7 +644,9 @@
       .map(function (x) { return x.c; });
   }
 
-  // Todo lo que la fila de una línea necesita. opts: { now, projectFilter, maxChips (default 2) }.
+  // Todo lo que la fila necesita. opts: { now, projectFilter, maxChips (default 2), phone }.
+  // phone: el título ocupa el 1er renglón completo y proyecto · chips · hora van al 2º, así que los
+  // chips no le quitan ancho al título (view.phone lo usa quien pinta).
   // Texto de sesiones siempre pasa por plainText; quien pinta usa textContent.
   function rowView(s, opts) {
     opts = opts || {};
@@ -671,6 +673,7 @@
 
     var when = agoFrom(s.lastActivityAt || s.startedAt, now);
     return {
+      phone: opts.phone === true,
       status: st,
       title: title,
       project: project,
@@ -691,6 +694,12 @@
     if (!r || r.enabled !== true) return 'local-off';
     if (r.local === true) return 'local-remote';
     return r.paired === true ? 'paired' : 'pair';
+  }
+
+  // En la PWA emparejada el push reemplaza a "activar avisos" (notificaciones de la pestaña):
+  // dos botones de avisos confunden. En local y en escritorio queda como siempre.
+  function tabNotifyVisible(mode, supported) {
+    return supported === true && mode !== 'paired';
   }
 
   // El token viaja en el fragmento: '#pair=<b64url>'. Cualquier otro hash → ''.
@@ -748,7 +757,7 @@
   if (typeof document === 'undefined') {
     if (typeof module !== 'undefined' && module.exports) {
       module.exports = {
-        uiMode: uiMode, pairTokenFromHash: pairTokenFromHash, normalizeCode: normalizeCode, formatCode: formatCode,
+        uiMode: uiMode, tabNotifyVisible: tabNotifyVisible, pairTokenFromHash: pairTokenFromHash, normalizeCode: normalizeCode, formatCode: formatCode,
         b64urlToBytes: b64urlToBytes, isIOSNeedsInstall: isIOSNeedsInstall, deepLinkSession: deepLinkSession,
         pairCountdown: pairCountdown,
         validPrUrl: validPrUrl, validArtifactUrl: validArtifactUrl, validPrs: validPrs, validArtifacts: validArtifacts,
@@ -1009,7 +1018,8 @@
 
   function updateNotifyBtn() {
     var b = $('btn-notify');
-    if (!notifySupported()) { b.hidden = true; return; }
+    b.hidden = !tabNotifyVisible(remoteMode, notifySupported());
+    if (b.hidden) return;
     var denied = Notification.permission === 'denied';
     b.disabled = denied;
     b.textContent = denied ? 'avisos bloqueados' : (notifyOn ? 'avisos: activados' : 'activar avisos');
@@ -1298,11 +1308,22 @@
     r.appendChild(dot);
 
     // Un renglón (DD-37): punto · título · proyecto · chips · hora. El estado va en aria-label.
-    var v = rowView(s, { now: nowMs(), projectFilter: filters.project, maxChips: isPhone() ? 1 : 2, copies: nCopies });
+    // Teléfono: dos renglones (título a todo el ancho; proyecto · chips · hora debajo).
+    var v = rowView(s, { now: nowMs(), projectFilter: filters.project, phone: isPhone(), copies: nCopies });
     r.title = v.tooltip;
     r.setAttribute('aria-label', v.ariaLabel + (nCopies > 1 ? ', ' + nCopies + ' sesiones con el mismo título' : ''));
-    r.appendChild(el('span', 'row-title', v.title));
-    if (v.project) r.appendChild(el('span', 'row-proj', v.project));
+    var host = r;
+    if (v.phone) {
+      r.classList.add('row-phone');
+      var body = el('span', 'row-body');
+      r.appendChild(body);
+      body.appendChild(el('span', 'row-title', v.title));
+      host = el('span', 'row-sub');
+      body.appendChild(host);
+    } else {
+      r.appendChild(el('span', 'row-title', v.title));
+    }
+    if (v.project) host.appendChild(el('span', 'row-proj', v.project));
     if (v.chips.length || v.extra) {
       var w = el('span', 'chips');
       v.chips.forEach(function (c) {
@@ -1319,9 +1340,9 @@
         w.appendChild(n);
       });
       if (v.extra) w.appendChild(chip('more', '+' + v.extra, v.extraTitle));
-      r.appendChild(w);
+      host.appendChild(w);
     }
-    r.appendChild(el('span', 'row-when num', v.when));
+    host.appendChild(el('span', 'row-when num', v.when));
     r.addEventListener('click', function () { select(key, true); });
     return r;
   }
@@ -1928,6 +1949,19 @@
     if (open && isPhone()) window.scrollTo(0, 0);
   }
 
+  // Teléfono: filtros + buscador + historial detrás del botón "Filtros" (plegado por defecto).
+  // El estado persiste; en escritorio la clase no tiene efecto (el panel siempre se ve).
+  var FILTERS_KEY = 'claude-dashboard.filtersOpen';
+  var filtersOpen = readFlag(FILTERS_KEY);
+
+  function setFiltersOpen(open) {
+    filtersOpen = open;
+    writeFlag(FILTERS_KEY, open);
+    document.body.classList.toggle('filters-open', open);
+    var b = $('btn-filters');
+    if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
   function onKey(ev, search) {
     if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
     var ae = document.activeElement;
@@ -1959,6 +1993,7 @@
       if (isPhone()) { phoneDetail = true; render(); window.scrollTo(0, 0); }
     } else if (k === '/') {
       ev.preventDefault();
+      if (isPhone()) setFiltersOpen(true); // el buscador vive en el panel plegado
       search.focus();
     } else if (k === '1' || k === '2' || k === '3') {
       filters.status = toggleStatusFilter(filters.status, STATUS_FILTERS[+k - 1]);
@@ -2491,6 +2526,7 @@
       if (n && !keep) n.remove();
     });
     if (remoteMode !== 'pair') { var ps = $('pair-screen'); if (ps) ps.hidden = true; }
+    updateNotifyBtn();
     if (remoteMode === 'local-remote') ensurePhoneButton();
     if (remoteMode === 'paired') { registerSW(); ensurePushButton(); }
   }
@@ -2560,6 +2596,8 @@
     $('history-close').addEventListener('click', closeHistory);
     $('history').addEventListener('click', function (ev) { if (ev.target === $('history')) closeHistory(); });
     $('btn-history').addEventListener('click', function (ev) { openHistory(ev.currentTarget); });
+    setFiltersOpen(filtersOpen);
+    $('btn-filters').addEventListener('click', function () { setFiltersOpen(!filtersOpen); });
     var search = $('f-search');
     search.addEventListener('input', function () { query = search.value; render(); });
     document.addEventListener('keydown', function (ev) { onKey(ev, search); });

@@ -91,6 +91,7 @@ h1 { margin: 0; font-size: 1.1rem; }
   padding: 3px 6px;
   max-width: 55vw;
 }
+.btn-filters { display: none; }
 .check { display: inline-flex; align-items: center; gap: 4px; }
 .search { display: inline-flex; align-items: center; gap: 4px; }
 .search input {
@@ -343,16 +344,48 @@ button.counter-link b { font-size: 1rem; color: var(--fg); }
 
 /* ---- teléfono: lista y detalle en pantallas separadas (DD-31) ---- */
 @media (max-width: 760px) {
-  .top { padding: 8px; }
+  .top { padding: 6px 8px; }
   main { padding: 8px; }
   .split { grid-template-columns: minmax(0, 1fr); }
   .detail { position: static; max-height: none; display: none; }
-  body.phone-detail .list, body.phone-detail .inbox, body.phone-detail .top .filters, body.phone-detail .top .counters { display: none; }
-  body.phone-detail .detail { display: grid; }
   .back { display: inline-block; }
   .kbd-hint { display: none; }
-  .row-proj { display: none; }
   .qr-box { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+
+  /* encabezado compacto: título + estado + "Filtros" en un renglón, contadores en otro (scroll propio) */
+  .top-row { gap: 4px 8px; }
+  h1 { font-size: 1rem; }
+  .btn-filters { display: inline-block; margin-left: auto; min-height: 36px; }
+  .counters { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; gap: 6px; font-size: 0.8rem; padding-bottom: 2px; }
+  .counters > * { flex: none; white-space: nowrap; }
+  button.counter { font-size: 0.8rem; padding: 2px 8px; }
+  .filters { display: none; margin-top: 8px; }
+  body.filters-open .top .filters { display: flex; }
+  .filters .search { flex: 1 1 100%; }
+  .filters .search input { flex: 1 1 auto; width: auto; min-width: 0; max-width: none; min-height: 36px; }
+  .filters button, .filters select { min-height: 36px; }
+  body.phone-detail .list, body.phone-detail .inbox, body.phone-detail .top .filters, body.phone-detail .top .counters, body.phone-detail .btn-filters { display: none; }
+  body.phone-detail .detail { display: grid; }
+
+  /* filas de 2 renglones: título a todo el ancho; proyecto · chips · hora debajo (≥ 44 px) */
+  .row.row-phone { height: auto; min-height: 44px; padding: 6px 12px; }
+  .row-body { flex: 1 1 0; min-width: 0; display: grid; gap: 2px; }
+  .row-sub { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 0.75rem; color: var(--muted); }
+  .row-sub .row-proj { max-width: 12ch; }
+  .row-sub .chips { flex: 0 1 auto; overflow: hidden; }
+  .row-sub .row-when { margin-left: auto; }
+
+  /* bandeja: título a todo el ancho, el resto debajo */
+  .ask-card header { flex-wrap: wrap; row-gap: 2px; }
+  .ask-card header strong { flex: 1 1 100%; }
+  .ask-card header .meta { max-width: none; flex: 1 1 0; }
+  .ask-card .ask-actions button { min-height: 36px; }
+
+  /* línea de tiempo apilada: "hora · tipo" arriba, texto a todo el ancho debajo */
+  .ev-text { flex: 1 1 100%; }
+
+  /* detalle sin card dentro de card */
+  .detail { border: 0; border-radius: 0; background: transparent; padding: 2px 0; }
 }
 
 /* franja compacta (DD-37): dos renglones por tarjeta */
