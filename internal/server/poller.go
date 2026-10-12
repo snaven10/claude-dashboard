@@ -310,6 +310,12 @@ func (s *Server) Refresh(ctx context.Context) (bool, error) {
 	}
 	sum := sha256.Sum256(body)
 
+	// El antirrebote necesita ver también los ciclos sin cambios (DD-52): se
+	// observa antes del corte por hash y fuera de s.mu. No bloquea (cola propia).
+	if s.Notifier != nil {
+		s.Notifier.Observe(sessions)
+	}
+
 	s.mu.Lock()
 	if s.have && sum == s.hash {
 		s.mu.Unlock()

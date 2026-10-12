@@ -20,6 +20,7 @@ import (
 	"claude-dashboard/internal/orq"
 	"claude-dashboard/internal/remote"
 	"claude-dashboard/internal/transcript"
+	"claude-dashboard/internal/webpush"
 )
 
 const (
@@ -62,6 +63,10 @@ type Server struct {
 	// Pairing y Devices: emparejamiento y dispositivos (DD-46..49); solo con PublicURL.
 	Pairing *remote.Pairing
 	Devices *remote.Devices
+	// Subs, Keys y Notifier: avisos push (DD-50..53); nil = sin /api/push/* ni avisos.
+	Subs     *remote.Subscriptions
+	Keys     *webpush.Keys
+	Notifier *Notifier
 
 	mu       sync.Mutex
 	hash     [32]byte
@@ -146,6 +151,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/sessions/{sessionId}/timeline", s.handleTimeline)
 	mux.HandleFunc("GET /api/history", s.handleHistory)
 	s.registerRemote(mux)
+	s.registerPush(mux)
 	if s.Static != nil {
 		mux.Handle("/", staticHandler(s.Static))
 	}

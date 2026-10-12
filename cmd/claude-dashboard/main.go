@@ -19,6 +19,7 @@ import (
 	"claude-dashboard/internal/remote"
 	"claude-dashboard/internal/server"
 	"claude-dashboard/internal/transcript"
+	"claude-dashboard/internal/webpush"
 	"claude-dashboard/web"
 )
 
@@ -42,6 +43,8 @@ func run() error {
 	publicURL := flag.String("public-url", "", "origen https del panel en la tailnet (ej. https://mi-pc.tailnet-ejemplo.ts.net); vacío = modo remoto apagado")
 	remoteAddr := flag.String("remote-addr", "127.0.0.1:7778", "listener loopback al que apunta `tailscale serve` (solo con -public-url)")
 	stateDir := flag.String("state-dir", "", "directorio de estado del modo remoto (vacío = ~/.config/claude-dashboard)")
+	pushContent := flag.String("push-content", server.PushContentTitle, "contenido de los avisos push: full (título + detalle), title (título + proyecto) o none (genérico)")
+	pushCooldown := flag.Duration("push-cooldown", 2*time.Minute, "no repetir el aviso push de una misma sesión antes de este tiempo (0 lo desactiva)")
 	flag.Parse()
 
 	if *interval <= 0 {
@@ -59,6 +62,12 @@ func run() error {
 	if *histInterval < 0 {
 		return fmt.Errorf("-history-interval no puede ser negativo")
 	}
+	if !server.ValidPushContent(*pushContent) {
+		return fmt.Errorf("-push-content %q inválido: usá full, title o none", *pushContent)
+	}
+	if *pushCooldown < 0 {
+		return fmt.Errorf("-push-cooldown no puede ser negativo")
+	}
 	if err := server.ValidateAddr(*addr, *allowRemote); err != nil {
 		return err
 	}
@@ -68,6 +77,8 @@ func run() error {
 	var publicOrigin, remoteListen string
 	var pairing *remote.Pairing
 	var devices *remote.Devices
+	var subs *remote.Subscriptions
+	var keys *webpush.Keys
 	if *publicURL != "" {
 		origin, err := remote.ParsePublicURL(*publicURL)
 		if err != nil {
@@ -83,12 +94,51 @@ func run() error {
 		if err != nil {
 			return err
 		}
+		store, err := remote.NewStore(dir)
+		if err != nil {
+			return err
+		}
+		if devices, err = remote.NewDevices(store); err != nil {
+			return err
+		}
+		if subs, err = remote.NewSubscriptions(store); err != nil {
+			return err
+		}
+		if keys, err = webpush.LoadOrCreateKeys(store.Path("vapid.json")); err != nil {
+			return err
+		}
+		keys.Subject = origin
+		pairing = &remote.Pairing{}
 		log.Printf("modo remoto: %s → %s (estado en %s)", origin, *remoteAddr, dir)
 		publicOrigin, remoteListen = origin, *remoteAddr
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Avisos push (DD-52/53): solo con modo remoto. El Sender usa su cliente por
+	// defecto (guard SSRF); NO se le inyecta un http.Client propio.
+	var notifier *server.Notifier
+	if subs != nil && keys != nil {
+		sender := &webpush.Sender{Keys: keys}
+		sender.OnGone = func(endpoint string) {
+			if _, err := subs.Remove(endpoint); err != nil {
+				log.Printf("push: borrando suscripción vencida: %v", err)
+			}
+		}
+		sender.Start(ctx)
+		defer sender.Wait()
+		notifier = &server.Notifier{
+			Cooldown: *pushCooldown,
+			Content:  *pushContent,
+			Logf:     log.Printf,
+			Enqueue: func(payload []byte, topic string) {
+				for _, sub := range subs.All() {
+					sender.Enqueue(webpush.Subscription{Endpoint: sub.Endpoint, P256dh: sub.P256dh, Auth: sub.Auth}, payload, topic)
+				}
+			},
+		}
+	}
 
 	hist := &history.Scanner{ProjectOf: agents.ProjectName}
 	if *histInterval > 0 {
@@ -128,6 +178,9 @@ func run() error {
 		RemoteAddr: remoteListen,
 		Pairing:    pairing,
 		Devices:    devices,
+		Subs:       subs,
+		Keys:       keys,
+		Notifier:   notifier,
 	}
 	return s.ListenAndServe(ctx, *addr)
 }
