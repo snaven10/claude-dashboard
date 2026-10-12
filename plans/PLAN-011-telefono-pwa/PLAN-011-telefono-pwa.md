@@ -75,7 +75,8 @@ fuerte (`ecdsa.Verify` con la clave pública y el formato r||s) y queda en sonne
 | 3 | **TASK-034** | Tras 031 y 033 (toca `internal/server/` y `cmd/`, que 031 también tocó) |
 | 4 | **TASK-036** | Tras 031, 034, 035 **y con PLAN-010 mergeado**: pisa `web/app.js`, `web/app.css`, `web/index.html`, `web/app.test.js` |
 | 5 | **TASK-037** | Tras 034 y 036 (documenta el contrato final) |
-| 6 | **TASK-038** | Tras todo; requiere los pasos manuales del usuario en Tailscale |
+| 6 | **TASK-039** | Hallazgo del gate (TASK-038 en curso): vista teléfono. Pisa `web/app.js`, `web/app.css`, `web/index.html`, `web/app.test.js` |
+| 7 | **TASK-038** | Tras todo; requiere los pasos manuales del usuario en Tailscale (se completa después de 039) |
 
 **Dependencia blanda con PLAN-010** (rediseño de la lista, `web/app.js`/`app.css`):
 - **TASK-036** pisa `web/app.js`, `web/app.css`, `web/index.html`, `web/app.test.js` → se ejecuta
