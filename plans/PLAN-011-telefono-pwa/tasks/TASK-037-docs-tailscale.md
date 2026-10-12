@@ -4,7 +4,7 @@
 - **Especialista:** claude-dashboard-worker (sonnet)
 - **Proyecto:** claude-dashboard (`~/personal/claude-dashboard`), rama de la task desde `main`
 - **Depende de:** TASK-034, TASK-036 (documenta el contrato y la UI finales)
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -69,10 +69,9 @@ Tailscale paso a paso (incluido WSL2), qué se expone y qué no, y las limitacio
 - [ ] Links internos de README a docs/API.md resuelven (anclas existentes).
 
 ## Resultado
-<!-- SE LLENA AL CERRAR -->
-- **Estado final:**
-- **Resumen:**
-- **Archivos tocados:**
-- **Verificado por:**
-- **Desviaciones:**
-- **Riesgos abiertos / siguiente:**
+- **Estado final:** done
+- **Resumen:** README con modo remoto (Promesas, Ajustes con las 5 flags nuevas + `-allow-remote`, override de `ExecStart` vía `systemctl --user edit`, sección "En el teléfono (Tailscale + PWA)" con pasos, qué se expone, `-push-content`, WSL2 con receta `vmIdleTimeout=-1`/linger y limitaciones iOS/Android). `docs/API.md` con "Modo remoto (PLAN-011)": tabla de listeners, los 8 endpoints nuevos, cookie `cd_device`, archivos de estado, reglas del notificador y payload por modo. La frase de PLAN-004 remite al modo remoto.
+- **Archivos tocados:** `README.md`, `docs/API.md` (commit 2773c31).
+- **Verificado por:** doc-only, sin tests Go. Defaults de flags comparados con `flag.*` de `cmd/claude-dashboard/main.go`; rutas comparadas con `HandleFunc` de `internal/server` (server.go, remote.go, notify.go: todas documentadas); `git grep` de IPs en README/docs solo da 127.0.0.1; "funnel" aparece una sola vez (la advertencia); anclas `#en-el-teléfono-tailscale--pwa` y `#modo-remoto-plan-011` existen. `gofmt -l .` vacío.
+- **Desviaciones:** documenté el comportamiento real del código, no del design: `url` del aviso es `/` si el sessionId no matchea `[A-Za-z0-9_-]{1,128}`; `GET /api/remote` es 404 (ruta inexistente) con el modo remoto apagado, no `enabled:false`; el tag del aviso es `cd-<12 hex de SHA-256(sessionKey)>` (no documentado en API.md por ser detalle interno). No documenté el límite de 8 KB/4 KB salvo en los endpoints.
+- **Riesgos abiertos / siguiente:** TASK-038 (smoke en teléfono real). Sin verificar en dispositivo: comportamiento de cookies de la PWA en iOS y la receta de WSL (`vmIdleTimeout`, reenvío localhost de Windows).
