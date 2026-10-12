@@ -222,6 +222,12 @@ func (s *Server) handleDeviceRevoke(w http.ResponseWriter, r *http.Request) {
 		writeJSONStatus(w, http.StatusNotFound, map[string]string{"error": "not found"})
 		return
 	}
+	// DD-49: revocar borra también las suscripciones push del dispositivo.
+	if s.Subs != nil {
+		if _, err := s.Subs.RemoveDevice(id); err != nil {
+			s.logf("devices/revoke: borrando suscripciones de %s: %v", id, err)
+		}
+	}
 	s.closeDevice(id)
 	w.WriteHeader(http.StatusNoContent)
 }
