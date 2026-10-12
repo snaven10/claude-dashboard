@@ -356,7 +356,8 @@ button.counter-link b { font-size: 1rem; color: var(--fg); }
   .top-row { gap: 4px 8px; }
   h1 { font-size: 1rem; }
   .btn-filters { display: inline-block; margin-left: auto; min-height: 36px; }
-  .counters { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; gap: 6px; font-size: 0.8rem; padding-bottom: 2px; }
+  .counters { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; gap: 6px; font-size: 0.8rem; padding-bottom: 2px; scrollbar-width: none; }
+  .counters::-webkit-scrollbar { display: none; }
   .counters > * { flex: none; white-space: nowrap; }
   button.counter { font-size: 0.8rem; padding: 2px 8px; }
   .filters { display: none; margin-top: 8px; }
