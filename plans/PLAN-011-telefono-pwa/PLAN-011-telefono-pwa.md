@@ -1,7 +1,7 @@
 # PLAN-011 — El panel en el teléfono: Tailscale + PWA + avisos push
 
 **Fecha:** 2026-10-11
-**Fase:** 2 (Ejecución) — aprobado por el usuario 2026-10-11
+**Fase:** Cerrado
 **Diseño:** [`PLAN-011-design.md`](./PLAN-011-design.md)
 **Fase anterior:** [PLAN-004](../PLAN-004-abrir-en-telefono/PLAN-004-abrir-en-telefono.md) (QR de Remote Control; dejó "abrir el PANEL desde el teléfono" fuera de alcance)
 **Proyectos:** claude-dashboard (`~/personal/claude-dashboard`)
@@ -50,14 +50,14 @@ expone el panel.
 |------|-----|--------------|--------|------------|--------|
 | **TASK-030** | Flags del modo remoto, segundo listener loopback, store de estado 0600, rutas estáticas de la PWA | claude-dashboard-worker | sonnet | — | `done` |
 | **TASK-031** | Emparejamiento (token + código), cookie de dispositivo, gate del listener remoto, dispositivos y revocación | claude-dashboard-worker | sonnet | TASK-030 | `done` |
-| **TASK-032** | Cifrado aes128gcm de Web Push (RFC 8291/8188) con el vector del RFC | claude-dashboard-worker | **opus** | — | `pending` |
-| **TASK-033** | Claves VAPID + JWT ES256 + envío HTTP al servicio de push + store de suscripciones | claude-dashboard-worker | sonnet | TASK-030, TASK-032 | `pending` |
-| **TASK-034** | Notificador en el poller (transición, antirrebote, cooldown, agrupado, `-push-content`) + endpoints `/api/push/*` | claude-dashboard-worker | sonnet | TASK-031, TASK-033 | `pending` |
-| **TASK-035** | PWA: manifest, íconos, `sw.js`, tags en `index.html` | claude-dashboard-worker | sonnet | TASK-030 · blanda: PLAN-010 (`index.html`) | `pending` |
-| **TASK-036** | Frontend: "conectar teléfono" (QR, código, dispositivos), pantalla de emparejar, botón de avisos push | claude-dashboard-worker | sonnet | TASK-031, TASK-034, TASK-035 · **PLAN-010 cerrado** | `pending` |
-| **TASK-037** | README + docs/API.md + guía Tailscale/WSL + limitaciones iOS/Android | claude-dashboard-worker | sonnet | TASK-034, TASK-036 | `pending` |
-| **TASK-038** | Smoke end-to-end + **gate del usuario con su teléfono real** | orquestador + usuario | — | TASK-037 | `pending` |
-| **TASK-039** | Vista teléfono legible: encabezado compacto, filas de 2 renglones, timeline apilada, un solo botón de avisos (hallazgo del gate de TASK-038) | claude-dashboard-worker | sonnet | TASK-036 | `pending` |
+| **TASK-032** | Cifrado aes128gcm de Web Push (RFC 8291/8188) con el vector del RFC | claude-dashboard-worker | **opus** | — | `done` |
+| **TASK-033** | Claves VAPID + JWT ES256 + envío HTTP al servicio de push + store de suscripciones | claude-dashboard-worker | sonnet | TASK-030, TASK-032 | `done` |
+| **TASK-034** | Notificador en el poller (transición, antirrebote, cooldown, agrupado, `-push-content`) + endpoints `/api/push/*` | claude-dashboard-worker | sonnet | TASK-031, TASK-033 | `done` |
+| **TASK-035** | PWA: manifest, íconos, `sw.js`, tags en `index.html` | claude-dashboard-worker | sonnet | TASK-030 · blanda: PLAN-010 (`index.html`) | `done` |
+| **TASK-036** | Frontend: "conectar teléfono" (QR, código, dispositivos), pantalla de emparejar, botón de avisos push | claude-dashboard-worker | sonnet | TASK-031, TASK-034, TASK-035 · **PLAN-010 cerrado** | `done` |
+| **TASK-037** | README + docs/API.md + guía Tailscale/WSL + limitaciones iOS/Android | claude-dashboard-worker | sonnet | TASK-034, TASK-036 | `done` |
+| **TASK-038** | Smoke end-to-end + **gate del usuario con su teléfono real** | orquestador + usuario | — | TASK-037 | `done` |
+| **TASK-039** | Vista teléfono legible: encabezado compacto, filas de 2 renglones, timeline apilada, un solo botón de avisos (hallazgo del gate de TASK-038) | claude-dashboard-worker | sonnet | TASK-036 | `done` |
 
 **Modelo de TASK-032 = opus.** Es poco código, pero el vector del RFC solo prueba la derivación
 de claves con entradas fijas: un error que lo pasa igual — reusar `salt` o la clave efímera entre
@@ -131,9 +131,9 @@ fuerte (`ecdsa.Verify` con la clave pública y el formato r||s) y queda en sonne
 3. **WSL apagado:** el README advierte **y** trae la receta para mantener la VM viva. El plan no la ejecuta.
 
 ## 8. Cierre
-<!-- SE LLENA AL CERRAR EL PLAN -->
-- **Cerrado:**
-- **Shipeó:**
-- **Verificación:**
-- **Quedó afuera:**
-- **Continúa en:**
+- **Cerrado:** 2026-10-11
+- **Shipeó:** modo remoto opt-in (`-public-url`) con segundo listener loopback para `tailscale serve`; emparejamiento por QR/código con cookie de dispositivo de 90 días y revocación; Web Push en Go stdlib (aes128gcm RFC 8291 verificado con el vector del RFC, VAPID ES256, guard SSRF: sin redirecciones y solo IPs públicas al conectar); notificador con antirrebote y cooldown; PWA (manifest, íconos, service worker que nunca cachea `/api`); pantalla "conectar teléfono"; vista teléfono legible (TASK-039); docs y guía de Tailscale/WSL.
+- **Verificación:** `go test -race ./...` y `node --test web/` (98) en verde; TASK-038 con el teléfono Android real: emparejado, PWA instalada, aviso push recibido con el teléfono bloqueado.
+- **NO verificado:** iOS, tocar el aviso → abrir la sesión, latencia, SSE en vivo por `serve` medido, QR reusado, apagar el modo remoto (Paso 7).
+- **Quedó afuera:** log de envíos exitosos; botón de avisos fuera del panel "Filtros" en el teléfono.
+- **Continúa en:** —

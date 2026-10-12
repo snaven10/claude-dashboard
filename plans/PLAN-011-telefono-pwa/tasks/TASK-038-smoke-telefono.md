@@ -4,7 +4,7 @@
 - **Especialista:** orquestador (lo automatizable) + **usuario (gate con el teléfono real)**
 - **Proyecto:** claude-dashboard (`~/personal/claude-dashboard`), `main` con TASK-030..037 mergeadas
 - **Depende de:** TASK-037
-- **Estado:** `pending`
+- **Estado:** `done`
 
 ---
 
@@ -50,10 +50,15 @@ teléfono → PWA instalada → avisos activados → push con la app cerrada cua
   el `Resultado` usa los ejemplos genéricos.
 
 ## Resultado
-<!-- SE LLENA AL CERRAR -->
-- **Estado final:**
-- **Resumen:**
-- **Archivos tocados:**
+- **Estado final:** done (2026-10-11), con el usuario y su teléfono Android.
+- **Resumen:** el flujo completo anda en un teléfono real: QR → panel emparejado → PWA instalada → avisos push activados → aviso recibido con el teléfono bloqueado.
+- **Archivos tocados:** ninguno del código en esta task. Fuera del repo: override `~/.config/systemd/user/claude-dashboard.service.d/remoto.conf` (`-public-url`) y `tailscale serve --bg --https=443 http://127.0.0.1:7778` (tailnet only).
 - **Verificado por:**
-- **Desviaciones:**
-- **Riesgos abiertos / siguiente:**
+  - Paso 1: HTTPS de la tailnet activado y Tailscale en el teléfono (usuario). `serve` en modo "tailnet only".
+  - Paso 2: local `/` y `/api/sessions` → 200; `:7778/api/sessions` sin cookie → 401; `:7778/api/remote` → `{"enabled":true,"local":false,"paired":false}`; `POST :7778/api/pair/new` → 404; por la URL de la tailnet `/api/sessions` → 401; `~/.config/claude-dashboard` 0700, archivos 0600.
+  - Paso 3 (Android, Chrome): QR escaneado, canje OK (sin 403 de Origin), PWA instalada, avisos activados; `subscriptions.json` con 1 suscripción contra el servicio de push de Google.
+  - Paso 4: con el teléfono bloqueado, una sesión pasó a "esperándote" (pregunta de prueba) y el aviso llegó (confirmado por el usuario).
+  - Paso 6 (parcial): dispositivo de prueba emparejado desde Chromium por la URL de la tailnet → ve el panel; revocado → 204 y fuera de la lista. Sin cookie → 401.
+  - Hallazgos del gate → TASK-039 (vista teléfono) y renombre de la máquina en Tailscale (la URL dejaba ver el nombre de un cliente; ahora es un nombre genérico). Tras renombrar hubo que rehacer `tailscale serve` (queda atado al nombre viejo) y re-emparejar.
+- **No verificado:** iOS; tocar el aviso → abre la sesión (no confirmado); latencia exacta (el servicio no loguea envíos exitosos); SSE por `serve` medido (el panel cargó con datos, sin medir actualizaciones en vivo); reusar un QR ya canjeado; Paso 7 (el usuario deja el modo remoto activo).
+- **Riesgos abiertos / siguiente:** si WSL apaga la VM no hay panel ni avisos (receta en el README); el botón de avisos quedó dentro de "Filtros" en el teléfono.
