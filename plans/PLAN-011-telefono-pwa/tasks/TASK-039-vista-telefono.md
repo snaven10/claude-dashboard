@@ -3,7 +3,7 @@
 - **Plan:** PLAN-011 — El panel en el teléfono
 - **Especialista:** claude-dashboard-worker (sonnet)
 - **Proyecto:** claude-dashboard (`~/personal/claude-dashboard`), rama `feature/plan-11-task-039` desde `main`
-- **Depende de:** TASK-036 (mergeada) · hallazgo del gate de TASK-038
+- **Depende de:** TASK-036
 - **Estado:** `pending`
 
 ---
