@@ -4,7 +4,7 @@
 - **Especialista:** orquestador (con el usuario para el paso en el panel real)
 - **Proyecto:** claude-dashboard (raíz del repo), rama `main` con TASK-022..TASK-028 mergeadas
 - **Depende de:** TASK-022, TASK-023, TASK-024, TASK-025, TASK-026, TASK-027, TASK-028 (o su `skipped`)
-- **Estado:** `in_progress`
+- **Estado:** `done`
 
 ---
 
@@ -46,7 +46,7 @@ master §1 se cumplen y nada de lo que había que mantener (§4) se rompió.
 - [ ] `## 6. Cierre` del master lleno, incluyendo qué **no** se verificó.
 
 ## Resultado
-- **Estado final:** in_progress — Pasos 1-5 hechos (2026-10-11); falta el Paso 6 (panel real, requiere `make install` con OK del usuario).
+- **Estado final:** done — Pasos 1-6 (2026-10-11; el Paso 6 con OK del usuario para `make install`).
 - **Resumen:** el flujo integrado en `main` cumple las metas con el fixture. Un bug encontrado y arreglado en el smoke: con el filtro `1` (esperándote) el aviso "Las N sesiones que te esperan están arriba" no salía si había abandonadas en la lista (`listed` las contaba); ahora cuenta solo las filas vivas (`web/app.js`, `renderList`).
 - **Verificado por:**
   - Paso 1: `node --check` ok; `node --test web/` 82/82; `gofmt -l .` vacío; `go vet` ok; `go test -race ./...` ok; `innerHTML` 0.
@@ -67,5 +67,6 @@ master §1 se cumplen y nada de lo que había que mantener (§4) se rompió.
   - Paso 3 (390×844): 3 tarjetas + 8 filas visibles (base: 6), fila 28 px, `scrollWidth` 375; fila → detalle → "← volver" ok; tarjeta → detalle ok.
   - Paso 4: `j` recorre bandeja → filas; `1` filtra y muestra el aviso (tras el fix); `2` deja 7 trabajando; `/` enfoca la búsqueda, "docs" deja 2 filas, `Esc` limpia; filtro de proyecto oculta la etiqueta de proyecto; agrupar por plan muestra `PLAN-42 · 14/28 done · 1 blocked · 2 in_progress` con barra de avance.
   - Paso 5: `?fixture` original carga (6 tarjetas, 10 filas), sin `▯` ni texto crudo.
-- **No verificado:** `Enter`/flechas con teclado físico (solo eventos sintéticos), lector de pantalla, `prefers-reduced-motion`, conservación de selección/scroll con SSE real (el fixture no emite eventos). Paso 6 pendiente.
+  - Paso 6 (panel real tras `make install`, 1440×900, tema oscuro): 1 tarjeta en la bandeja + 16 filas (6 trabajando, 12 idle con dos `×2`), **todas visibles sin scroll**; `Terminadas (34)` y `Abandonadas (4)` plegadas; 0 duplicados bandeja/lista; 16 claves únicas; fila 28 px; sin textos crudos de `waitingFor`; sin `▯`; sin scroll horizontal. La tarjeta muestra `pide permiso: Bash: …` (con `ask`). Log del servicio: `waiting sin ask … waitingFor=- motivo=sin-transcript` para 4 sesiones (las abandonadas): confirma el camino "sin transcript" de §2.1. Nada del panel real se copió al repo.
+- **No verificado:** `Enter`/flechas con teclado físico (solo eventos sintéticos), lector de pantalla, `prefers-reduced-motion`, conservación de selección/scroll con SSE (el panel real actualizó sin errores, pero no se midió la selección), un caso real de `waitingFor` = `permission prompt` sin `ask`.
 - **Observaciones para después (fuera de alcance):** en la bandeja de 3 columnas el título de una tarjeta con rama queda muy recortado ("Revisar mig…"); el encabezado de plan muestra "· 8 ·" (cantidad de sesiones) sin etiqueta, comportamiento anterior a este plan.

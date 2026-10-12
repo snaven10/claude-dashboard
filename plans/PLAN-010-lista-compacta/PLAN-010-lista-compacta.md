@@ -1,7 +1,7 @@
 # PLAN-010 — Lista compacta: todas las sesiones en una pantalla y el motivo real de espera
 
 **Fecha:** 2026-10-11
-**Fase:** 2 (Ejecución) — aprobado por el usuario 2026-10-11
+**Fase:** Cerrado
 **Fase anterior:** [PLAN-007](../PLAN-007-bandeja/PLAN-007-bandeja.md) (bandeja) y [PLAN-008](../PLAN-008-datos-de-sesion/PLAN-008-datos-de-sesion.md) (datos de sesión)
 **Proyectos:** claude-dashboard (raíz del repo)
 **Origen:** observación del orquestador en el panel real a 1440×900 (18 sesiones vivas + 21 terminadas + 4 abandonadas) y queja del usuario: "no puedo ver todas las sesiones, se pierde información"
@@ -90,9 +90,9 @@ para medir 25+ filas → TASK-022 crea un fixture de lista con el escenario real
 | **TASK-024** | Fila de una línea, lista 60 %, encabezado en 2 renglones, timeline alta | claude-dashboard-worker | sonnet | TASK-022 | `done` |
 | **TASK-025** | Grupos por estado con contador; terminadas/abandonadas en el encabezado; la que espera sale de la lista y la bandeja entra en j/k | claude-dashboard-worker | sonnet | TASK-024 | `done` |
 | **TASK-026** | Colapso "×N" de repetidos + clave de fila única + sección "Copias" en el detalle | claude-dashboard-worker | sonnet | TASK-025 | `done` |
-| **TASK-027** | Motivo real de espera (`waitView`) en bandeja, detalle y avisos | claude-dashboard-worker | sonnet | TASK-026 (mismo archivo; lógicamente solo TASK-025). TASK-023 confirma §2.1 al cerrar | `pending` |
-| **TASK-028** | Íconos: verificar en el navegador del usuario y, si hace falta, SVG inline / caracteres seguros | claude-dashboard-worker | sonnet | TASK-027 | `pending` |
-| **TASK-029** | Smoke end-to-end con capturas y conteo de filas (claro/oscuro, 1440×900 y teléfono) | orquestador | — | TASK-022..TASK-028 | `pending` |
+| **TASK-027** | Motivo real de espera (`waitView`) en bandeja, detalle y avisos | claude-dashboard-worker | sonnet | TASK-026 (mismo archivo; lógicamente solo TASK-025). TASK-023 confirma §2.1 al cerrar | `done` |
+| **TASK-028** | Íconos: verificar en el navegador del usuario y, si hace falta, SVG inline / caracteres seguros | claude-dashboard-worker | sonnet | TASK-027 | `done` |
+| **TASK-029** | Smoke end-to-end con capturas y conteo de filas (claro/oscuro, 1440×900 y teléfono) | orquestador | — | TASK-022..TASK-028 | `done` |
 
 ### Paralelismo
 
@@ -234,9 +234,9 @@ historial va inline en el HTML estático. Los caracteres de controles (`✕ ▾ 
 - Nuevos atajos de teclado.
 
 ## 6. Cierre
-<!-- SE LLENA AL CERRAR EL PLAN -->
-- **Cerrado:**
-- **Shipeó:**
-- **Verificación:**
-- **Quedó afuera:**
-- **Continúa en:**
+- **Cerrado:** 2026-10-11
+- **Shipeó:** fila de una línea (28 px) con lista al 60 %, grupos por estado con contador, la sesión que espera solo en la bandeja (y primero en j/k), colapso "×N" con clave de fila única por PID, motivo real de espera (bandeja, detalle, aviso), íconos SVG propios, timeline más alta, log `waiting sin ask` en el servicio (TASK-022..028). Fix del smoke: aviso de la bandeja con el filtro `1` aunque haya abandonadas.
+- **Verificación:** TASK-029 — fixture: 12 → 16 de 16 entradas activas visibles a 1440×900, 6 → 11 en teléfono, 3-4 → 11 eventos de timeline; panel real: 17 de 17 visibles, sin duplicados ni textos crudos. `go test -race ./...` y `node --test web/` (82) en verde.
+- **NO verificado:** teclado físico, lector de pantalla, `prefers-reduced-motion`, selección/scroll bajo SSE medido, un `permission prompt` real sin `ask`.
+- **Quedó afuera:** título de tarjeta de la bandeja muy recortado cuando trae rama; "· N ·" sin etiqueta en el encabezado de plan (anterior a este plan).
+- **Continúa en:** —
