@@ -609,6 +609,27 @@ test('rowView: turno corto no es chip; maxChips 1 (teléfono) manda el resto a "
   assert.strictEqual(sin.extra, 0);
 });
 
+test('rowView: modo teléfono muestra 2 chips (van al 2º renglón, no recortan el título)', () => {
+  const v = RVIEW.rowView(cargada(), { now: RNOW, projectFilter: '', phone: true });
+  assert.strictEqual(v.phone, true);
+  assert.strictEqual(v.chips.length, 2);
+  assert.ok(v.extra > 0);
+  assert.ok(v.title.length > 0 && v.when);
+  // el título no se toca: lo mismo que en escritorio
+  const d = RVIEW.rowView(cargada(), { now: RNOW, projectFilter: '' });
+  assert.strictEqual(d.phone, false);
+  assert.strictEqual(v.title, d.title);
+  // maxChips explícito gana sobre el default del modo
+  assert.strictEqual(RVIEW.rowView(cargada(), { now: RNOW, projectFilter: '', phone: true, maxChips: 1 }).chips.length, 1);
+});
+
+test('tabNotifyVisible: en paired el push reemplaza a "activar avisos"; el resto igual', () => {
+  assert.strictEqual(phone.tabNotifyVisible('paired', true), false);
+  assert.strictEqual(phone.tabNotifyVisible('local-off', true), true);
+  assert.strictEqual(phone.tabNotifyVisible('local-remote', true), true);
+  assert.strictEqual(phone.tabNotifyVisible('local-off', false), false);
+});
+
 test('rowView: proyecto oculto con filtro de proyecto activo', () => {
   const x = s('p', 'idle', { title: 'algo', project: 'web-app' });
   assert.strictEqual(RVIEW.rowView(x, { now: RNOW, projectFilter: '' }).project, 'web-app');

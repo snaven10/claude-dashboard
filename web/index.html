@@ -18,6 +18,7 @@
     <div class="top-row">
       <h1>Claude Dashboard</h1>
       <span id="conn" class="conn conn-off" role="status" aria-live="polite">conectando…</span>
+      <button type="button" id="btn-filters" class="btn-filters" aria-expanded="false" aria-controls="filters">Filtros</button>
       <div class="counters" aria-label="Resumen">
         <button type="button" id="c-waiting" class="counter c-waiting" aria-pressed="false" title="Filtrar por este estado (1)"><b id="n-waiting">0</b> esperándote</button>
         <button type="button" id="c-busy" class="counter c-busy" aria-pressed="false" title="Filtrar por este estado (2)"><b id="n-busy">0</b> trabajando</button>
@@ -27,7 +28,7 @@
         <span id="today" class="today" hidden></span>
       </div>
     </div>
-    <div class="filters">
+    <div class="filters" id="filters">
       <label>Proyecto
         <select id="f-project"><option value="">Todos</option></select>
       </label>
